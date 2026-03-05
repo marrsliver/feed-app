@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export async function GET() {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('manual_posts')
     .select('*')
     .order('added_at', { ascending: false })
@@ -14,7 +14,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const { feedId, post, addedAt } = await req.json()
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('manual_posts')
     .insert({ id: post.id, feed_id: feedId, post_data: post, added_at: addedAt })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

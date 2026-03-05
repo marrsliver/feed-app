@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export async function GET() {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('user_sources')
     .select('*')
     .order('added_at', { ascending: true })
@@ -17,7 +17,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const { id, name, url, feedUrl, color, inFeed, addedAt } = await req.json()
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('user_sources')
     .insert({ id, name, url, feed_url: feedUrl, color, in_feed: inFeed, added_at: addedAt })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
