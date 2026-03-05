@@ -1,6 +1,6 @@
 import type { Source } from './types'
 
-export const sources: Source[] = [
+export const researchSources: Source[] = [
   {
     id: 'forensic-architecture',
     name: 'Forensic Architecture',
@@ -57,6 +57,19 @@ export const sources: Source[] = [
   },
 ]
 
+export const musicSources: Source[] = [
+  {
+    id: 'nts',
+    name: 'NTS Radio',
+    url: 'https://www.nts.live',
+    type: 'custom',
+    color: '#ff5500',
+  },
+]
+
+// Combined for legacy compatibility
+export const sources = researchSources
+
 export function getSourceById(id: string): Source | undefined {
-  return sources.find((s) => s.id === id)
+  return [...researchSources, ...musicSources].find((s) => s.id === id)
 }

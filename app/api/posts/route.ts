@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sources } from '@/lib/sources.config'
+import { researchSources, musicSources } from '@/lib/sources.config'
+
+const sources = [...researchSources, ...musicSources]
 import { fetchSource } from '@/lib/fetchers'
 import type { Post } from '@/lib/types'
 
