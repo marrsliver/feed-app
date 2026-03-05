@@ -193,7 +193,7 @@ export function Feed({ sources, feedId }: Props) {
       )}
 
       {/* Status */}
-      {status === 'pending' && (
+      {status === 'pending' && sources.length > 0 && (
         <div className="flex justify-center py-20">
           <Loader2 className="animate-spin text-indigo-500" size={32} />
         </div>
