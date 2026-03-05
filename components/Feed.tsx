@@ -3,12 +3,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Loader2, BookmarkCheck, BookmarkIcon } from 'lucide-react'
+import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles } from 'lucide-react'
 import type { Post, Source, PostsApiResponse } from '@/lib/types'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
 import { SearchBar } from './SearchBar'
 import { ListsSidebar } from './ListsSidebar'
+import { AskPanel } from './AskPanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
@@ -46,6 +47,7 @@ export function Feed({ sources }: Props) {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<string>('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [askOpen, setAskOpen] = useState(false)
   const { lists, createList, deleteList, renameList } = useSavedLists()
 
   // Reset to 'all' if active list is deleted
@@ -102,6 +104,15 @@ export function Feed({ sources }: Props) {
             <SearchBar value={query} onChange={setQuery} />
           </div>
 
+          {/* Ask for help button */}
+          <button
+            onClick={() => setAskOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+          >
+            <Sparkles size={13} />
+            Ask
+          </button>
+
           {/* Lists button / active filter chip */}
           {isFiltering ? (
             <div className="shrink-0 flex items-center border border-black bg-black text-white text-xs font-medium overflow-hidden">
@@ -137,6 +148,11 @@ export function Feed({ sources }: Props) {
           onToggle={toggleSource}
         />
       </div>
+
+      {/* Ask panel */}
+      {askOpen && (
+        <AskPanel posts={allPosts} onClose={() => setAskOpen(false)} />
+      )}
 
       {/* Lists sidebar */}
       {sidebarOpen && (
