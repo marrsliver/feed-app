@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f3f4f6;
+  --foreground: #111827;
+}
+
+html {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Hide scrollbar for filter pills */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Masonry column content */
+.masonry-grid_column > div {
+  margin-bottom: 1rem;
+}
