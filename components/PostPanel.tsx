@@ -11,6 +11,7 @@ interface Props {
   post: Post
   feedId?: string
   onMove?: () => void
+  onDelete?: () => void
   onClose: () => void
 }
 
@@ -106,7 +107,7 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onMove, onClose }: Props) {
+export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const isManual = post.sourceId === 'manual'
   const otherFeedLabel = feedId === 'research' ? 'Music Feed' : 'Research Feed'
@@ -210,6 +211,15 @@ export function PostPanel({ post, feedId, onMove, onClose }: Props) {
                 >
                   <ArrowLeftRight size={13} />
                   Move to {otherFeedLabel}
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => { onDelete(); onClose() }}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 text-xs font-medium text-black/50 hover:border-red-200 hover:text-red-600 hover:border-red-300 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Delete card
                 </button>
               )}
             </div>

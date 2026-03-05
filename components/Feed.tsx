@@ -13,6 +13,7 @@ import { AskPanel } from './AskPanel'
 import { AddLinkPanel } from './AddLinkPanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { useManualPosts } from '@/hooks/useManualPosts'
+import { useHiddenPosts } from '@/hooks/useHiddenPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
 interface Props {
@@ -54,7 +55,8 @@ export function Feed({ sources, feedId }: Props) {
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
-  const { posts: manualPosts, addPost, movePost } = useManualPosts(feedId)
+  const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
+  const { hiddenIds, hidePost } = useHiddenPosts()
 
   // Reset to 'all' if active list is deleted
   useEffect(() => {
@@ -97,7 +99,7 @@ export function Feed({ sources, feedId }: Props) {
   const allPosts: Post[] = [
     ...manualPosts,
     ...fetchedPosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
-  ]
+  ].filter((p) => !hiddenIds.includes(p.id))
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
@@ -228,6 +230,7 @@ export function Feed({ sources, feedId }: Props) {
               post={post}
               feedId={feedId}
               onMove={post.sourceId === 'manual' ? () => movePost(post.id, otherFeedId) : undefined}
+              onDelete={() => post.sourceId === 'manual' ? removePost(post.id) : hidePost(post.id)}
             />
           ))}
         </Masonry>
