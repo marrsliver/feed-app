@@ -3,65 +3,53 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Post } from '@/lib/types'
 
-const STORAGE_KEY = 'feed-manual-posts'
-
-function load(): Record<string, Post[]> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
-  return {}
-}
-
-function save(data: Record<string, Post[]>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch { /* ignore */ }
-}
-
 export function useManualPosts(feedId: string) {
-  const [data, setData] = useState<Record<string, Post[]>>({})
+  const [allPosts, setAllPosts] = useState<{ feedId: string; post: Post; addedAt: number }[]>([])
 
-  useEffect(() => { setData(load()) }, [])
-
-  // Re-read when a post is restored from the archive (cross-component event)
   useEffect(() => {
-    const handler = () => setData(load())
+    fetch('/api/db/manual-posts')
+      .then((r) => r.json())
+      .then((data: { feedId: string; post: Post; addedAt: number }[]) => setAllPosts(data))
+      .catch(() => {})
+  }, [])
+
+  // Re-read when a post is restored from the archive
+  useEffect(() => {
+    const handler = () => {
+      fetch('/api/db/manual-posts')
+        .then((r) => r.json())
+        .then((data: { feedId: string; post: Post; addedAt: number }[]) => setAllPosts(data))
+        .catch(() => {})
+    }
     window.addEventListener('manual-posts-updated', handler)
     return () => window.removeEventListener('manual-posts-updated', handler)
   }, [])
 
-  const posts: Post[] = data[feedId] ?? []
+  const posts: Post[] = allPosts.filter((r) => r.feedId === feedId).map((r) => r.post)
 
   const addPost = useCallback((post: Post) => {
-    setData((prev) => {
-      const next = { ...prev, [feedId]: [post, ...(prev[feedId] ?? [])] }
-      save(next)
-      return next
-    })
+    const addedAt = Date.now()
+    setAllPosts((prev) => [{ feedId, post, addedAt }, ...prev])
+    fetch('/api/db/manual-posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedId, post, addedAt }),
+    }).catch(() => {})
   }, [feedId])
 
   const removePost = useCallback((postId: string) => {
-    setData((prev) => {
-      const next = { ...prev, [feedId]: (prev[feedId] ?? []).filter((p) => p.id !== postId) }
-      save(next)
-      return next
-    })
-  }, [feedId])
+    setAllPosts((prev) => prev.filter((r) => r.post.id !== postId))
+    fetch(`/api/db/manual-posts/${postId}`, { method: 'DELETE' }).catch(() => {})
+  }, [])
 
   const movePost = useCallback((postId: string, toFeedId: string) => {
-    // Read fresh from localStorage to avoid stale-state race conditions
-    const current = load()
-    const post = (current[feedId] ?? []).find((p) => p.id === postId)
-    if (!post) return
-    const next = {
-      ...current,
-      [feedId]: (current[feedId] ?? []).filter((p) => p.id !== postId),
-      [toFeedId]: [post, ...(current[toFeedId] ?? [])],
-    }
-    save(next)
-    setData(next)
-  }, [feedId])
+    setAllPosts((prev) => prev.map((r) => r.post.id === postId ? { ...r, feedId: toFeedId } : r))
+    fetch(`/api/db/manual-posts/${postId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedId: toFeedId }),
+    }).catch(() => {})
+  }, [])
 
   return { posts, addPost, removePost, movePost }
 }

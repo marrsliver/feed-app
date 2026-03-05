@@ -3,53 +3,52 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { UserSource } from '@/lib/types'
 
-const STORAGE_KEY = 'feed-user-sources'
-
 const COLORS = [
   '#6366f1', '#10b981', '#f59e0b', '#ef4444',
   '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16',
 ]
 
-function load(): UserSource[] {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY)
-    if (s) return JSON.parse(s)
-  } catch { /* ignore */ }
-  return []
-}
-
-function save(sources: UserSource[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sources)) } catch { /* ignore */ }
-}
-
 export function useUserSources() {
   const [sources, setSources] = useState<UserSource[]>([])
 
-  useEffect(() => { setSources(load()) }, [])
+  useEffect(() => {
+    fetch('/api/db/user-sources')
+      .then((r) => r.json())
+      .then((data: UserSource[]) => setSources(data))
+      .catch(() => {})
+  }, [])
 
   const addSource = useCallback((source: Omit<UserSource, 'color' | 'addedAt'>) => {
     setSources((prev) => {
-      // Prevent duplicate feed URLs
       if (prev.some((s) => s.feedUrl === source.feedUrl)) return prev
       const color = COLORS[prev.length % COLORS.length]
-      const next = [...prev, { ...source, color, addedAt: Date.now() }]
-      save(next)
+      const addedAt = Date.now()
+      const next = [...prev, { ...source, color, addedAt }]
+      fetch('/api/db/user-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...source, color, addedAt }),
+      }).catch(() => {})
       return next
     })
   }, [])
 
   const removeSource = useCallback((id: string) => {
-    setSources((prev) => {
-      const next = prev.filter((s) => s.id !== id)
-      save(next)
-      return next
-    })
+    setSources((prev) => prev.filter((s) => s.id !== id))
+    fetch(`/api/db/user-sources/${id}`, { method: 'DELETE' }).catch(() => {})
   }, [])
 
   const toggleFeed = useCallback((id: string) => {
     setSources((prev) => {
       const next = prev.map((s) => s.id === id ? { ...s, inFeed: !s.inFeed } : s)
-      save(next)
+      const updated = next.find((s) => s.id === id)
+      if (updated) {
+        fetch(`/api/db/user-sources/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inFeed: updated.inFeed }),
+        }).catch(() => {})
+      }
       return next
     })
   }, [])
