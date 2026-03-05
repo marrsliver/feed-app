@@ -54,8 +54,7 @@ export function Feed({ sources, feedId }: Props) {
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
-  const { posts: manualPosts, addPost, removePost } = useManualPosts(feedId)
-  const { addPost: addToOtherFeed } = useManualPosts(otherFeedId)
+  const { posts: manualPosts, addPost, movePost } = useManualPosts(feedId)
 
   // Reset to 'all' if active list is deleted
   useEffect(() => {
@@ -73,6 +72,7 @@ export function Feed({ sources, feedId }: Props) {
         fetchPosts(pageParam as number, activeSourcesList, query),
       initialPageParam: 1,
       getNextPageParam: (last) => last.nextPage ?? undefined,
+      enabled: sources.length > 0,
     })
 
   const loadMore = useCallback(() => {
@@ -205,11 +205,13 @@ export function Feed({ sources, feedId }: Props) {
         </div>
       )}
 
-      {status === 'success' && displayPosts.length === 0 && (
-        <div className="text-center py-20 text-gray-400 text-sm">
-          {view === 'all'
-            ? 'No posts found.'
-            : `No posts saved to "${activeList?.name}" yet.`}
+      {(status === 'success' || sources.length === 0) && displayPosts.length === 0 && (
+        <div className="text-center py-20 text-black/25 text-sm">
+          {view !== 'all'
+            ? `No posts saved to "${activeList?.name}" yet.`
+            : sources.length === 0
+            ? 'Add links using the Add button above.'
+            : 'No posts found.'}
         </div>
       )}
 
@@ -225,7 +227,7 @@ export function Feed({ sources, feedId }: Props) {
               key={post.id}
               post={post}
               feedId={feedId}
-              onMove={post.sourceId === 'manual' ? () => { removePost(post.id); addToOtherFeed(post) } : undefined}
+              onMove={post.sourceId === 'manual' ? () => movePost(post.id, otherFeedId) : undefined}
             />
           ))}
         </Masonry>

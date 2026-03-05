@@ -42,5 +42,19 @@ export function useManualPosts(feedId: string) {
     })
   }, [feedId])
 
-  return { posts, addPost, removePost }
+  const movePost = useCallback((postId: string, toFeedId: string) => {
+    // Read fresh from localStorage to avoid stale-state race conditions
+    const current = load()
+    const post = (current[feedId] ?? []).find((p) => p.id === postId)
+    if (!post) return
+    const next = {
+      ...current,
+      [feedId]: (current[feedId] ?? []).filter((p) => p.id !== postId),
+      [toFeedId]: [post, ...(current[toFeedId] ?? [])],
+    }
+    save(next)
+    setData(next)
+  }, [feedId])
+
+  return { posts, addPost, removePost, movePost }
 }
