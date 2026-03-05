@@ -65,6 +65,14 @@ export const musicSources: Source[] = [
     type: 'custom',
     color: '#ff5500',
   },
+  {
+    id: 'oroko',
+    name: 'Oroko Radio',
+    url: 'https://oroko.live',
+    type: 'custom',
+    color: '#e9521e',
+    apiPath: 'OrokoRadio',
+  },
 ]
 
 // Combined for legacy compatibility

@@ -6,6 +6,7 @@ import { fetchForensicArchitecture } from './forensic-architecture'
 import { fetchEflux } from './eflux'
 import { fetchFieldProjects } from './field-projects'
 import { fetchNTS } from './nts'
+import { fetchMixcloud } from './mixcloud'
 
 // Custom fetchers keyed by source ID
 const customFetchers: Record<
@@ -16,6 +17,7 @@ const customFetchers: Record<
   'eflux': fetchEflux,
   'field-projects': fetchFieldProjects,
   'nts': fetchNTS,
+  'oroko': fetchMixcloud,
 }
 
 export async function fetchSource(
