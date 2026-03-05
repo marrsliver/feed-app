@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { X, ArrowUpRight, Trash2 } from 'lucide-react'
+import { X, ArrowUpRight, Trash2, Pencil, Check } from 'lucide-react'
 import type { Post } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { BookmarkButton } from './BookmarkButton'
@@ -26,8 +26,86 @@ function formatTime(ts: number): string {
   })
 }
 
+function NoteRow({
+  text,
+  createdAt,
+  onEdit,
+  onDelete,
+}: {
+  text: string
+  createdAt: number
+  onEdit: (text: string) => void
+  onDelete: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(text)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  function commit() {
+    if (draft.trim()) onEdit(draft)
+    else setDraft(text) // revert if empty
+    setEditing(false)
+  }
+
+  return (
+    <div className="group flex gap-3">
+      <div className="flex-1 space-y-0.5">
+        {editing ? (
+          <textarea
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commit()
+              if (e.key === 'Escape') { setDraft(text); setEditing(false) }
+            }}
+            onBlur={commit}
+            rows={2}
+            className="w-full text-sm border border-black/20 px-2 py-1.5 resize-none outline-none focus:border-black/40 transition-colors"
+          />
+        ) : (
+          <p className="text-sm text-black leading-relaxed">{text}</p>
+        )}
+        <p className="text-[9px] text-black/25 tracking-widest uppercase">
+          {formatTime(createdAt)}
+        </p>
+      </div>
+      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {editing ? (
+          <button
+            onClick={commit}
+            className="p-1 text-black/40 hover:text-black transition-colors"
+            aria-label="Save"
+          >
+            <Check size={12} />
+          </button>
+        ) : (
+          <button
+            onClick={() => setEditing(true)}
+            className="p-1 text-black/20 hover:text-black/60 transition-colors"
+            aria-label="Edit note"
+          >
+            <Pencil size={12} />
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          className="p-1 text-black/20 hover:text-black/60 transition-colors"
+          aria-label="Delete note"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function PostPanel({ post, onClose }: Props) {
-  const { addComment, deleteComment, getComments } = useComments()
+  const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(post.id)
   const [draft, setDraft] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -135,21 +213,13 @@ export function PostPanel({ post, onClose }: Props) {
             {comments.length > 0 && (
               <div className="space-y-3">
                 {comments.map((c) => (
-                  <div key={c.id} className="group flex gap-3">
-                    <div className="flex-1 space-y-0.5">
-                      <p className="text-sm text-black leading-relaxed">{c.text}</p>
-                      <p className="text-[9px] text-black/25 tracking-widest uppercase">
-                        {formatTime(c.createdAt)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => deleteComment(post.id, c.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-black/20 hover:text-black/60 transition-all shrink-0"
-                      aria-label="Delete note"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
+                  <NoteRow
+                    key={c.id}
+                    text={c.text}
+                    createdAt={c.createdAt}
+                    onEdit={(text) => editComment(post.id, c.id, text)}
+                    onDelete={() => deleteComment(post.id, c.id)}
+                  />
                 ))}
               </div>
             )}

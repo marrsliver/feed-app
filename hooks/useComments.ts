@@ -46,10 +46,23 @@ export function useComments() {
     })
   }, [])
 
+  const editComment = useCallback((postId: string, commentId: string, text: string) => {
+    setData((prev) => {
+      const next = {
+        ...prev,
+        [postId]: (prev[postId] ?? []).map((c) =>
+          c.id === commentId ? { ...c, text: text.trim() } : c
+        ),
+      }
+      save(next)
+      return next
+    })
+  }, [])
+
   const getComments = useCallback(
     (postId: string) => data[postId] ?? [],
     [data]
   )
 
-  return { addComment, deleteComment, getComments }
+  return { addComment, deleteComment, editComment, getComments }
 }
