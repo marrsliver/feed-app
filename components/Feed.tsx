@@ -112,6 +112,9 @@ export function Feed({ sources, feedId, showSources }: Props) {
     })
   }, [userSources])
 
+  // Parallel queries — only for sources that are in the feed
+  const feedUserSources = userSources.filter((s) => s.inFeed)
+
   const allSourceIds = [...sources.map((s) => s.id), ...feedUserSources.map((s) => s.id)]
 
   const toggleSource = useCallback((id: string) => {
@@ -122,9 +125,6 @@ export function Feed({ sources, feedId, showSources }: Props) {
       return new Set([id])
     })
   }, [allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Parallel queries — only for sources that are in the feed
-  const feedUserSources = userSources.filter((s) => s.inFeed)
   const userSourceResults = useQueries({
     queries: feedUserSources.map((source) => ({
       queryKey: ['user-source', source.id],
