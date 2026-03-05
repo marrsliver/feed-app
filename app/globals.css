@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #f3f4f6;
-  --foreground: #111827;
+  --background: #ffffff;
+  --foreground: #0a0a0a;
 }
 
 html {
@@ -12,16 +12,19 @@ html {
   color: var(--foreground);
 }
 
-/* Hide scrollbar for filter pills */
+.font-sans {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Hide scrollbar */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
-}
-
-/* Masonry column content */
-.masonry-grid_column > div {
-  margin-bottom: 1rem;
 }

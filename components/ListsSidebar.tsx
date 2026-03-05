@@ -55,17 +55,17 @@ function ListRow({
 
   return (
     <div
-      className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-        active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700'
+      className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
+        active ? 'bg-black text-white' : 'hover:bg-black/5 text-black'
       }`}
       onClick={onSelect}
     >
       <div
-        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-          active ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'
+        className={`w-4 h-4 border flex items-center justify-center shrink-0 ${
+          active ? 'bg-white border-white' : 'border-black/20'
         }`}
       >
-        {active && <Check size={10} className="text-white" strokeWidth={3} />}
+        {active && <Check size={10} className="text-black" strokeWidth={3} />}
       </div>
 
       {renaming ? (
@@ -85,7 +85,7 @@ function ListRow({
         <span className="flex-1 text-sm font-medium truncate">{list.name}</span>
       )}
 
-      <span className={`text-xs shrink-0 ${active ? 'text-indigo-400' : 'text-gray-400'}`}>
+      <span className={`text-xs shrink-0 ${active ? 'text-white/50' : 'text-black/30'}`}>
         {list.postIds.length}
       </span>
 
@@ -163,17 +163,17 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
         <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
           {/* All */}
           <div
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-              view === 'all' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700'
+            className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
+              view === 'all' ? 'bg-black text-white' : 'hover:bg-black/5 text-black'
             }`}
             onClick={() => { onSetView('all'); onClose() }}
           >
             <div
-              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                view === 'all' ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'
+              className={`w-4 h-4 border flex items-center justify-center shrink-0 ${
+                view === 'all' ? 'bg-white border-white' : 'border-black/20'
               }`}
             >
-              {view === 'all' && <Check size={10} className="text-white" strokeWidth={3} />}
+              {view === 'all' && <Check size={10} className="text-black" strokeWidth={3} />}
             </div>
             <span className="flex-1 text-sm font-medium">All posts</span>
           </div>
@@ -215,7 +215,7 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
           ) : (
             <button
               onClick={() => setShowInput(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-indigo-600 hover:bg-indigo-50 transition-colors font-medium"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-black/50 hover:text-black hover:bg-black/5 transition-colors"
             >
               <Plus size={15} />
               New list

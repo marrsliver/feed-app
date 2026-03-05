@@ -23,11 +23,11 @@ export function BookmarkButton({ postId }: Props) {
           setOpen((prev) => !prev)
         }}
         aria-label="Save to list"
-        className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition-colors shadow"
+        className="p-1.5 bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
       >
         <Bookmark
           size={16}
-          className={saved ? 'fill-indigo-600 text-indigo-600' : 'text-gray-500'}
+          className={saved ? 'fill-black text-black' : 'text-black/30'}
         />
       </button>
       {open && <ListPickerDropdown postId={postId} onClose={() => setOpen(false)} />}

@@ -96,7 +96,7 @@ export function Feed({ sources }: Props) {
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 pb-3 pt-4 space-y-3">
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <SearchBar value={query} onChange={setQuery} />
@@ -104,10 +104,10 @@ export function Feed({ sources }: Props) {
 
           {/* Lists button / active filter chip */}
           {isFiltering ? (
-            <div className="shrink-0 flex items-center rounded-lg border border-indigo-600 bg-indigo-600 text-white text-xs font-medium overflow-hidden">
+            <div className="shrink-0 flex items-center border border-black bg-black text-white text-xs font-medium overflow-hidden">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 hover:bg-indigo-700 transition-colors"
+                className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 hover:bg-black/80 transition-colors"
               >
                 <BookmarkCheck size={13} />
                 {activeList?.name}
@@ -115,7 +115,7 @@ export function Feed({ sources }: Props) {
               <button
                 onClick={() => setView('all')}
                 aria-label="Clear filter"
-                className="pr-2 pl-1 py-1.5 hover:bg-indigo-700 transition-colors text-indigo-200 hover:text-white"
+                className="pr-2.5 pl-1 py-1.5 hover:bg-black/80 transition-colors text-white/50 hover:text-white"
               >
                 ×
               </button>
@@ -123,7 +123,7 @@ export function Feed({ sources }: Props) {
           ) : (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-gray-600 border-gray-200 hover:bg-gray-50 transition-colors"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
             >
               <BookmarkIcon size={13} />
               Lists

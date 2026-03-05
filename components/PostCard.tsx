@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import { ExternalLink } from 'lucide-react'
 import type { Post } from '@/lib/types'
 import { BookmarkButton } from './BookmarkButton'
 
@@ -28,17 +27,24 @@ export function PostCard({ post }: Props) {
         href={post.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="group block bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-100"
+        className="group block bg-white overflow-hidden transition-all duration-300"
+        style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.1)'
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 0 1px rgba(0,0,0,0.07)'
+        }}
       >
         {/* Image */}
         {post.image && (
-          <div className="relative w-full overflow-hidden bg-gray-100">
+          <div className="relative w-full overflow-hidden bg-black/5">
             <Image
               src={post.image}
               alt={post.title}
               width={600}
               height={400}
-              className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-300"
+              className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-500"
               unoptimized
             />
           </div>
@@ -46,11 +52,11 @@ export function PostCard({ post }: Props) {
 
         {/* Content */}
         <div className="p-4 space-y-2">
-          {/* Source badge + bookmark */}
+          {/* Source + bookmark */}
           <div className="flex items-center justify-between gap-2">
             <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full text-white"
-              style={{ backgroundColor: post.sourceColor }}
+              className="text-[9px] font-semibold uppercase tracking-[0.15em] px-1.5 py-0.5"
+              style={{ color: post.sourceColor }}
             >
               {post.sourceName}
             </span>
@@ -58,22 +64,21 @@ export function PostCard({ post }: Props) {
           </div>
 
           {/* Title */}
-          <h2 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-3 group-hover:text-indigo-700 transition-colors">
+          <h2 className="font-display text-sm font-semibold text-black leading-snug line-clamp-3 group-hover:opacity-60 transition-opacity duration-200">
             {post.title}
           </h2>
 
           {/* Excerpt */}
           {post.excerpt && (
-            <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+            <p className="text-xs text-black/40 leading-relaxed line-clamp-3">
               {post.excerpt}
             </p>
           )}
 
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-gray-400">{formatDate(post.date)}</span>
-            <ExternalLink size={12} className="text-gray-300 group-hover:text-indigo-400 transition-colors" />
-          </div>
+          {/* Date */}
+          <p className="text-[9px] text-black/25 tracking-widest uppercase pt-0.5">
+            {formatDate(post.date)}
+          </p>
         </div>
       </a>
     </div>
