@@ -1,70 +1,77 @@
+import * as cheerio from 'cheerio'
 import type { Source, FetcherResult, Post } from '../types'
-
-interface SquarespaceItem {
-  id: string
-  title: string
-  fullUrl: string
-  assetUrl?: string
-  body?: string
-  excerpt?: string
-  addedOn?: number
-  publishOn?: number
-}
-
-interface SquarespaceResponse {
-  items?: SquarespaceItem[]
-  collection?: { items?: SquarespaceItem[] }
-  pagination?: { hasNextPage?: boolean; nextPage?: string }
-}
 
 export async function fetchFieldProjects(
   source: Source,
   page: number
 ): Promise<FetcherResult> {
-  const baseUrl = 'https://www.fieldprojectsgallery.com/online'
-  const url = page > 1
-    ? `${baseUrl}?format=json&page=${page}`
-    : `${baseUrl}?format=json`
+  // Field Projects restructured their site — the /online page now has a static
+  // grid of exhibitions. We scrape the page for exhibition links and OG data.
+  if (page > 1) return { posts: [], hasMore: false }
 
-  const res = await fetch(url, {
-    headers: { 'Accept': 'application/json' },
+  const res = await fetch('https://www.fieldprojectsgallery.com/online', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
     next: { revalidate: 3600 },
   })
 
   if (!res.ok) throw new Error(`Field Projects fetch error ${res.status}`)
 
-  const data: SquarespaceResponse = await res.json()
+  const html = await res.text()
+  const $ = cheerio.load(html)
 
-  const items: SquarespaceItem[] = data.items ?? data.collection?.items ?? []
+  // Collect unique internal exhibition links (exclude nav/utility links)
+  const seen = new Set<string>()
+  const links: string[] = []
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href') ?? ''
+    const absolute = href.startsWith('http') ? href : `https://www.fieldprojectsgallery.com${href}`
+    if (
+      absolute.includes('fieldprojectsgallery.com') &&
+      !absolute.includes('instagram') &&
+      !absolute.includes('patreon') &&
+      absolute !== 'https://www.fieldprojectsgallery.com/online' &&
+      absolute !== 'https://www.fieldprojectsgallery.com/' &&
+      absolute !== 'http://www.fieldprojectsgallery.com/online' &&
+      !href.startsWith('#') &&
+      !seen.has(absolute)
+    ) {
+      seen.add(absolute)
+      links.push(absolute)
+    }
+  })
 
-  const posts: Post[] = items
-    .filter((item) => item.title && item.fullUrl)
-    .map((item) => {
-      const postUrl = item.fullUrl.startsWith('http')
-        ? item.fullUrl
-        : `https://www.fieldprojectsgallery.com${item.fullUrl}`
-
-      // Strip HTML from body for excerpt
-      const rawExcerpt = item.excerpt ?? item.body ?? ''
-      const excerpt = rawExcerpt.replace(/<[^>]+>/g, '').trim().slice(0, 200)
-
-      const ts = item.publishOn ?? item.addedOn
-      const date = ts ? new Date(ts).toISOString() : new Date().toISOString()
-
-      return {
-        id: `${source.id}-${item.id}`,
-        title: item.title,
-        url: postUrl,
-        image: item.assetUrl ?? undefined,
-        excerpt: excerpt || undefined,
-        date,
-        sourceId: source.id,
-        sourceName: source.name,
-        sourceColor: source.color,
-      }
+  // Fetch OG data for each exhibition page (cap at 10)
+  const posts: Post[] = []
+  await Promise.all(
+    links.slice(0, 10).map(async (url) => {
+      try {
+        const pageRes = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
+          signal: AbortSignal.timeout(6000),
+          next: { revalidate: 3600 },
+        })
+        if (!pageRes.ok) return
+        const pageHtml = await pageRes.text()
+        const $p = cheerio.load(pageHtml)
+        const og = (prop: string) =>
+          $p(`meta[property="og:${prop}"]`).attr('content') ??
+          $p(`meta[name="og:${prop}"]`).attr('content')
+        const title = og('title') ?? $p('title').text().trim()
+        if (!title) return
+        posts.push({
+          id: `${source.id}-${Buffer.from(url).toString('base64').slice(0, 20)}`,
+          title,
+          url,
+          image: og('image'),
+          excerpt: og('description')?.slice(0, 200),
+          date: new Date().toISOString(),
+          sourceId: source.id,
+          sourceName: source.name,
+          sourceColor: source.color,
+        })
+      } catch { /* skip failed pages */ }
     })
+  )
 
-  const hasMore = data.pagination?.hasNextPage ?? false
-
-  return { posts, nextPage: hasMore ? page + 1 : undefined, hasMore }
+  return { posts, hasMore: false }
 }

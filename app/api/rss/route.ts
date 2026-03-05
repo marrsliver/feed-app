@@ -1,6 +1,11 @@
 import * as cheerio from 'cheerio'
+import { createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { Post } from '@/lib/types'
+
+function urlId(url: string) {
+  return createHash('sha1').update(url).digest('hex').slice(0, 16)
+}
 
 // WordPress REST API fallback — tries common post type slugs when RSS is empty
 const WP_POST_TYPES = ['posts', 'stories', 'articles', 'news', 'updates', 'blog']
@@ -27,7 +32,7 @@ async function tryWordPressApi(baseUrl: string, sourceId: string, sourceName: st
         const image = Array.isArray(media) ? (media[0] as Record<string, string>)?.source_url : undefined
 
         return {
-          id: `${sourceId}-${Buffer.from(url).toString('base64').slice(0, 16)}`,
+          id: `${sourceId}-${urlId(url)}`,
           title,
           url,
           date,
@@ -104,7 +109,7 @@ export async function GET(req: Request) {
       }
 
       posts.push({
-        id: `${sourceId}-${Buffer.from(link).toString('base64').slice(0, 16)}`,
+        id: `${sourceId}-${urlId(link)}`,
         title,
         url: link,
         date: date ? new Date(date).toISOString() : new Date().toISOString(),
