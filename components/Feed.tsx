@@ -142,7 +142,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
     ...userSourcePosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
   ]
     .filter((p) => !hiddenIds.includes(p.id))
-    .filter((p) => activeSources.has(p.sourceId))
+    .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
