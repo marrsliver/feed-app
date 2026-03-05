@@ -217,25 +217,28 @@ export function Feed({ sources }: Props) {
 
           {/* Named list pills */}
           {lists.map((list) => (
-            <button
+            <div
               key={list.id}
-              onClick={() => setView(list.id)}
-              className={`group shrink-0 flex items-center gap-0.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              className={`group shrink-0 flex items-center gap-0.5 rounded-full text-xs font-medium transition-colors ${
                 view === list.id
                   ? 'bg-indigo-600 text-white'
                   : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <span>
+              <button
+                onClick={() => setView(list.id)}
+                className="pl-3 pr-1 py-1"
+              >
                 {list.name} ({list.postIds.length})
-              </span>
+              </button>
               <ListPillMenu
                 listId={list.id}
                 name={list.name}
                 onRename={renameList}
                 onDelete={deleteList}
               />
-            </button>
+              <span className="pr-1" />
+            </div>
           ))}
 
           {/* New list inline input or + button */}

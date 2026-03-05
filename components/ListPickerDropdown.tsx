@@ -42,6 +42,7 @@ export function ListPickerDropdown({ postId, onClose }: Props) {
   return (
     <div
       ref={containerRef}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
       className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-white rounded-lg shadow-lg border border-gray-200 py-1 text-sm"
     >
       {lists.length === 0 && !showInput && (
