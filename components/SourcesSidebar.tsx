@@ -11,6 +11,7 @@ interface Props {
   onRemoveSource: (id: string) => void
   onToggleFeed: (id: string) => void
   onClose: () => void
+  onShowCards: () => void
 }
 
 type DetectState =
@@ -25,7 +26,7 @@ type DisplaySource =
   | { kind: 'static'; id: string; name: string; url: string; color: string }
   | { kind: 'user'; id: string; name: string; url: string; color: string; inFeed: boolean }
 
-export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemoveSource, onToggleFeed, onClose }: Props) {
+export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemoveSource, onToggleFeed, onClose, onShowCards }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
   const [tab, setTab] = useState<TabView>('library')
@@ -85,9 +86,17 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
           <h2 className="text-sm font-semibold text-black">Sources</h2>
-          <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onShowCards}
+              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-black/30 hover:text-black border border-black/10 hover:border-black/30 transition-colors"
+            >
+              Show as cards
+            </button>
+            <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

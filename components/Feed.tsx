@@ -13,6 +13,7 @@ import { AskPanel } from './AskPanel'
 import { AddLinkPanel } from './AddLinkPanel'
 import { ArchivePanel } from './ArchivePanel'
 import { SourcesSidebar } from './SourcesSidebar'
+import { SourcesCardsView } from './SourcesCardsView'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { useUserSources } from '@/hooks/useUserSources'
 import { useManualPosts } from '@/hooks/useManualPosts'
@@ -72,6 +73,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
+  const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
   const { userSources, addSource, removeSource, toggleFeed } = useUserSources()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
@@ -245,6 +247,16 @@ export function Feed({ sources, feedId, showSources }: Props) {
           onRemoveSource={removeSource}
           onToggleFeed={toggleFeed}
           onClose={() => setSourcesOpen(false)}
+          onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
+        />
+      )}
+
+      {/* Sources cards view */}
+      {sourcesCardsOpen && (
+        <SourcesCardsView
+          staticSources={sources}
+          userSources={userSources}
+          onClose={() => setSourcesCardsOpen(false)}
         />
       )}
 
