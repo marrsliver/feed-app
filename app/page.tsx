@@ -7,7 +7,7 @@ export default function Home() {
     <main className="min-h-screen">
       <Header activeFeed="research" sourcesCount={researchSources.length} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Feed sources={researchSources} />
+        <Feed sources={researchSources} feedId="research" />
       </div>
     </main>
   )

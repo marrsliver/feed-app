@@ -8,6 +8,8 @@ import { PostPanel } from './PostPanel'
 
 interface Props {
   post: Post
+  feedId?: string
+  onMove?: () => void
 }
 
 function formatDate(dateStr: string): string {
@@ -22,7 +24,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post }: Props) {
+export function PostCard({ post, feedId, onMove }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
@@ -86,7 +88,7 @@ export function PostCard({ post }: Props) {
         </div>
       </div>
 
-      {panelOpen && <PostPanel post={post} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <PostPanel post={post} feedId={feedId} onMove={onMove} onClose={() => setPanelOpen(false)} />}
     </>
   )
 }

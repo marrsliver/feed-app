@@ -7,7 +7,7 @@ export default function MusicFeed() {
     <main className="min-h-screen">
       <Header activeFeed="music" sourcesCount={musicSources.length} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Feed sources={musicSources} />
+        <Feed sources={musicSources} feedId="music" />
       </div>
     </main>
   )

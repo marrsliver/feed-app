@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { X, ArrowUpRight, Trash2, Pencil, Check } from 'lucide-react'
+import { X, ArrowUpRight, Trash2, Pencil, Check, ArrowLeftRight } from 'lucide-react'
 import type { Post } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { BookmarkButton } from './BookmarkButton'
 
 interface Props {
   post: Post
+  feedId?: string
+  onMove?: () => void
   onClose: () => void
 }
 
@@ -104,8 +106,10 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, onClose }: Props) {
+export function PostPanel({ post, feedId, onMove, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
+  const isManual = post.sourceId === 'manual'
+  const otherFeedLabel = feedId === 'research' ? 'Music Feed' : 'Research Feed'
   const comments = getComments(post.id)
   const [draft, setDraft] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -188,16 +192,27 @@ export function PostPanel({ post, onClose }: Props) {
               </p>
             )}
 
-            {/* Open article button */}
-            <a
-              href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
-            >
-              Open article
-              <ArrowUpRight size={13} />
-            </a>
+            {/* Buttons row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <a
+                href={post.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
+              >
+                Open article
+                <ArrowUpRight size={13} />
+              </a>
+              {isManual && feedId && (
+                <button
+                  onClick={() => { onMove?.(); onClose() }}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 text-xs font-medium text-black/50 hover:border-black/50 hover:text-black transition-colors"
+                >
+                  <ArrowLeftRight size={13} />
+                  Move to {otherFeedLabel}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Divider */}

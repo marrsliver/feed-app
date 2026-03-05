@@ -3,18 +3,21 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles } from 'lucide-react'
+import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon } from 'lucide-react'
 import type { Post, Source, PostsApiResponse } from '@/lib/types'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
 import { SearchBar } from './SearchBar'
 import { ListsSidebar } from './ListsSidebar'
 import { AskPanel } from './AskPanel'
+import { AddLinkPanel } from './AddLinkPanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
+import { useManualPosts } from '@/hooks/useManualPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
 interface Props {
   sources: Source[]
+  feedId: string
 }
 
 async function fetchPosts(
@@ -40,7 +43,7 @@ const BREAKPOINTS = {
   640: 1,
 }
 
-export function Feed({ sources }: Props) {
+export function Feed({ sources, feedId }: Props) {
   const [activeSources, setActiveSources] = useState<Set<string>>(
     new Set(sources.map((s) => s.id))
   )
@@ -48,7 +51,11 @@ export function Feed({ sources }: Props) {
   const [view, setView] = useState<string>('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [askOpen, setAskOpen] = useState(false)
+  const [addLinkOpen, setAddLinkOpen] = useState(false)
   const { lists, createList, deleteList, renameList } = useSavedLists()
+  const otherFeedId = feedId === 'research' ? 'music' : 'research'
+  const { posts: manualPosts, addPost, removePost } = useManualPosts(feedId)
+  const { addPost: addToOtherFeed } = useManualPosts(otherFeedId)
 
   // Reset to 'all' if active list is deleted
   useEffect(() => {
@@ -86,7 +93,11 @@ export function Feed({ sources }: Props) {
     })
   }, [])
 
-  const allPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
+  const fetchedPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
+  const allPosts: Post[] = [
+    ...manualPosts,
+    ...fetchedPosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
+  ]
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
@@ -103,6 +114,15 @@ export function Feed({ sources }: Props) {
           <div className="flex-1">
             <SearchBar value={query} onChange={setQuery} />
           </div>
+
+          {/* Add link button */}
+          <button
+            onClick={() => setAddLinkOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+          >
+            <LinkIcon size={13} />
+            Add
+          </button>
 
           {/* Ask for help button */}
           <button
@@ -148,6 +168,11 @@ export function Feed({ sources }: Props) {
           onToggle={toggleSource}
         />
       </div>
+
+      {/* Add link panel */}
+      {addLinkOpen && (
+        <AddLinkPanel feedId={feedId} onAdd={addPost} onClose={() => setAddLinkOpen(false)} />
+      )}
 
       {/* Ask panel */}
       {askOpen && (
@@ -196,7 +221,12 @@ export function Feed({ sources }: Props) {
           columnClassName="pl-4 bg-clip-padding"
         >
           {displayPosts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard
+              key={post.id}
+              post={post}
+              feedId={feedId}
+              onMove={post.sourceId === 'manual' ? () => { removePost(post.id); addToOtherFeed(post) } : undefined}
+            />
           ))}
         </Masonry>
       )}
