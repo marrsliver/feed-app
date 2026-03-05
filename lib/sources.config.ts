@@ -48,6 +48,13 @@ export const sources: Source[] = [
     type: 'custom',
     color: '#525252',
   },
+  {
+    id: 'field-projects',
+    name: 'Field Projects',
+    url: 'https://www.fieldprojectsgallery.com/online',
+    type: 'custom',
+    color: '#2d6a4f',
+  },
 ]
 
 export function getSourceById(id: string): Source | undefined {

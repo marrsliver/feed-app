@@ -4,6 +4,7 @@ import { fetchRSS } from './rss'
 import { fetchScrape } from './scrape'
 import { fetchForensicArchitecture } from './forensic-architecture'
 import { fetchEflux } from './eflux'
+import { fetchFieldProjects } from './field-projects'
 
 // Custom fetchers keyed by source ID
 const customFetchers: Record<
@@ -12,6 +13,7 @@ const customFetchers: Record<
 > = {
   'forensic-architecture': fetchForensicArchitecture,
   'eflux': fetchEflux,
+  'field-projects': fetchFieldProjects,
 }
 
 export async function fetchSource(
