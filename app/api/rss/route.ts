@@ -29,23 +29,43 @@ export async function GET(req: Request) {
     items.each((_, el) => {
       const $el = $(el)
       const title = $el.find('title').first().text().trim()
-      const link = isAtom
-        ? ($el.find('link[rel="alternate"]').attr('href') ?? $el.find('link').not('[rel]').attr('href') ?? $el.find('link').first().attr('href') ?? '')
-        : ($el.find('link').first().text().trim() || $el.find('link').first().attr('href') || '')
+
+      // Link extraction: try multiple strategies
+      let link = ''
+      if (isAtom) {
+        link =
+          $el.find('link[rel="alternate"]').attr('href') ??
+          $el.find('link').not('[rel]').attr('href') ??
+          $el.find('link').first().attr('href') ??
+          $el.find('id').first().text().trim()
+      } else {
+        // RSS: <link> text, then <link> href attr, then <guid isPermaLink>
+        link =
+          $el.find('link').first().text().trim() ||
+          $el.find('link').first().attr('href') ||
+          ($el.find('guid').attr('isPermaLink') !== 'false' ? $el.find('guid').first().text().trim() : '') ||
+          ''
+      }
+
       const date = $el.find('pubDate, published, updated').first().text().trim()
+
+      // Excerpt: strip HTML from description/summary
       const excerpt = $el.find('description, summary').first().text()
         .replace(/<[^>]+>/g, '').trim().slice(0, 200) || undefined
 
       if (!title || !link) return
 
-      // Extract image: try enclosure, then media:content, then first <img> in description
+      // Image: try enclosure, then <img> inside raw HTML description content
       let image: string | undefined
       const enclosureUrl = $el.find('enclosure').attr('url')
       const enclosureType = $el.find('enclosure').attr('type') ?? ''
-      if (enclosureUrl && enclosureType.startsWith('image')) image = enclosureUrl
+      if (enclosureUrl && enclosureType.startsWith('image')) {
+        image = enclosureUrl
+      }
       if (!image) {
-        const descHtml = $el.find('description, content').first().text()
-        const imgMatch = descHtml.match(/<img[^>]+src=["']([^"']+)["']/i)
+        // description/content CDATA often contains raw HTML — use html() not text()
+        const rawHtml = $el.find('description, content').first().html() ?? ''
+        const imgMatch = rawHtml.match(/<img[^>]+src=["']([^"']+)["']/i)
         if (imgMatch) image = imgMatch[1]
       }
 

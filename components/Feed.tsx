@@ -135,11 +135,9 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const userSourcePosts: Post[] = userSourceResults.flatMap((r) => r.data ?? [])
 
   const fetchedPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
-  const allPosts: Post[] = [
-    ...manualPosts,
-    ...fetchedPosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
-    ...userSourcePosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
-  ]
+  const seenIds = new Set<string>()
+  const allPosts: Post[] = [...manualPosts, ...fetchedPosts, ...userSourcePosts]
+    .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
   const activeList = lists.find((l) => l.id === view)

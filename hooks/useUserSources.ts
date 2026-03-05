@@ -29,6 +29,8 @@ export function useUserSources() {
 
   const addSource = useCallback((source: Omit<UserSource, 'color' | 'addedAt'>) => {
     setSources((prev) => {
+      // Prevent duplicate feed URLs
+      if (prev.some((s) => s.feedUrl === source.feedUrl)) return prev
       const color = COLORS[prev.length % COLORS.length]
       const next = [...prev, { ...source, color, addedAt: Date.now() }]
       save(next)
