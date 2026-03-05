@@ -112,17 +112,16 @@ export function Feed({ sources, feedId, showSources }: Props) {
     })
   }, [userSources])
 
+  const allSourceIds = [...sources.map((s) => s.id), ...feedUserSources.map((s) => s.id)]
+
   const toggleSource = useCallback((id: string) => {
     setActiveSources((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
+      // If this is the only active source, reset to all
+      if (prev.size === 1 && prev.has(id)) return new Set(allSourceIds)
+      // Otherwise isolate this source
+      return new Set([id])
     })
-  }, [])
+  }, [allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parallel queries — only for sources that are in the feed
   const feedUserSources = userSources.filter((s) => s.inFeed)
