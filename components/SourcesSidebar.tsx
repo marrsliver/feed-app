@@ -19,12 +19,16 @@ type DetectState =
   | { status: 'found'; feedUrl: string; title: string; siteUrl: string }
   | { status: 'error'; message: string }
 
-type SortView = 'all' | 'feed' | 'list'
+type TabView = 'library' | 'feed' | 'list'
+
+type DisplaySource =
+  | { kind: 'static'; id: string; name: string; url: string; color: string }
+  | { kind: 'user'; id: string; name: string; url: string; color: string; inFeed: boolean }
 
 export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemoveSource, onToggleFeed, onClose }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
-  const [sortView, setSortView] = useState<SortView>('all')
+  const [tab, setTab] = useState<TabView>('library')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -50,22 +54,28 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
 
   function handleAdd(inFeed: boolean) {
     if (detect.status !== 'found') return
-    onAddSource({
-      id: `user-${Date.now()}`,
-      name: detect.title,
-      url: detect.siteUrl,
-      feedUrl: detect.feedUrl,
-      inFeed,
-    })
+    onAddSource({ id: `user-${Date.now()}`, name: detect.title, url: detect.siteUrl, feedUrl: detect.feedUrl, inFeed })
     setInputUrl('')
     setDetect({ status: 'idle' })
   }
 
-  const filteredUserSources = userSources.filter((s) => {
-    if (sortView === 'feed') return s.inFeed
-    if (sortView === 'list') return !s.inFeed
-    return true
-  })
+  // Build display lists
+  const allStatic: DisplaySource[] = staticSources.map((s) => ({ kind: 'static', id: s.id, name: s.name, url: s.url, color: s.color }))
+  const allUser: DisplaySource[] = userSources.map((s) => ({ kind: 'user', id: s.id, name: s.name, url: s.url, color: s.color, inFeed: s.inFeed }))
+
+  const byName = (a: DisplaySource, b: DisplaySource) => a.name.localeCompare(b.name)
+
+  const libraryList = [...allStatic, ...allUser].sort(byName)
+  const feedList = [...allStatic, ...allUser.filter((s) => s.kind === 'user' && (s as { inFeed: boolean }).inFeed)].sort(byName)
+  const listOnlyList = allUser.filter((s) => s.kind === 'user' && !(s as { inFeed: boolean }).inFeed).sort(byName)
+
+  const displayList = tab === 'library' ? libraryList : tab === 'feed' ? feedList : listOnlyList
+
+  const TABS: { id: TabView; label: string }[] = [
+    { id: 'library', label: 'Library' },
+    { id: 'feed', label: 'In Feed' },
+    { id: 'list', label: 'List Only' },
+  ]
 
   return (
     <>
@@ -80,91 +90,72 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
           </button>
         </div>
 
-        {/* Sort tabs — only shown when there are user sources */}
-        {userSources.length > 0 && (
-          <div className="flex border-b border-black/10 shrink-0">
-            {(['all', 'feed', 'list'] as SortView[]).map((tab) => {
-              const label = tab === 'all' ? 'All' : tab === 'feed' ? 'In feed' : 'List only'
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setSortView(tab)}
-                  className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-widest transition-colors ${
-                    sortView === tab ? 'text-black border-b-2 border-black -mb-px' : 'text-black/30 hover:text-black'
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex border-b border-black/10 shrink-0">
+          {TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                tab === id ? 'text-black border-b-2 border-black -mb-px' : 'text-black/30 hover:text-black'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {/* Source list */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Static sources — only shown in All view */}
-          {sortView === 'all' && staticSources.length > 0 && (
-            <div className="px-4 pt-4 pb-2">
-              <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30 mb-2">Built-in</p>
-              <div className="space-y-1">
-                {staticSources.map((s) => (
-                  <a
-                    key={s.id}
-                    href={s.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 py-1.5 group"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                    <span className="text-sm text-black/70 group-hover:text-black transition-colors truncate">{s.name}</span>
-                    <Rss size={10} className="shrink-0 text-black/20 ml-auto" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {displayList.length === 0 ? (
+            <p className="text-center py-10 text-black/25 text-xs">
+              {tab === 'feed' ? 'No sources in feed yet.' : 'No list-only sources yet.'}
+            </p>
+          ) : (
+            <div className="space-y-0.5">
+              {displayList.map((s) => (
+                <div key={s.id} className="flex items-center gap-2.5 py-1.5 group">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
 
-          {/* User-added sources */}
-          {filteredUserSources.length > 0 && (
-            <div className="px-4 pt-4 pb-2">
-              {sortView === 'all' && <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30 mb-2">Added by you</p>}
-              <div className="space-y-1">
-                {filteredUserSources.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2.5 py-1.5 group">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                  <div className="flex-1 min-w-0">
                     <a
                       href={s.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 text-sm text-black/70 group-hover:text-black transition-colors truncate"
+                      className="text-sm text-black/70 hover:text-black transition-colors truncate block"
                     >
                       {s.name}
                     </a>
-                    {/* In-feed toggle */}
-                    <button
-                      onClick={() => onToggleFeed(s.id)}
-                      title={s.inFeed ? 'In feed — click to move to list only' : 'List only — click to add to feed'}
-                      className={`shrink-0 p-1 transition-colors ${s.inFeed ? 'text-black/50 hover:text-black' : 'text-black/15 hover:text-black/40'}`}
-                    >
-                      {s.inFeed ? <Rss size={11} /> : <BookOpen size={11} />}
-                    </button>
-                    <button
-                      onClick={() => onRemoveSource(s.id)}
-                      className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-red-500 transition-all"
-                      aria-label="Remove source"
-                    >
-                      <Trash2 size={11} />
-                    </button>
+                    {/* Subtitle only shown in In Feed tab */}
+                    {tab === 'feed' && (
+                      <span className="text-[9px] text-black/25 uppercase tracking-widest">
+                        {s.kind === 'static' ? 'Built-in' : 'User added'}
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {filteredUserSources.length === 0 && userSources.length > 0 && (
-            <p className="text-center py-10 text-black/25 text-xs">
-              {sortView === 'feed' ? 'No sources in feed yet.' : 'No list-only sources yet.'}
-            </p>
+                  {/* Controls — user sources only */}
+                  {s.kind === 'user' && (
+                    <>
+                      <button
+                        onClick={() => onToggleFeed(s.id)}
+                        title={(s as { inFeed: boolean }).inFeed ? 'In feed — click to move to list only' : 'List only — click to add to feed'}
+                        className={`shrink-0 p-1 transition-colors ${(s as { inFeed: boolean }).inFeed ? 'text-black/40 hover:text-black' : 'text-black/15 hover:text-black/40'}`}
+                      >
+                        {(s as { inFeed: boolean }).inFeed ? <Rss size={11} /> : <BookOpen size={11} />}
+                      </button>
+                      <button
+                        onClick={() => onRemoveSource(s.id)}
+                        className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-red-500 transition-all"
+                        aria-label="Remove source"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
@@ -180,24 +171,13 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
               </div>
               <p className="text-[10px] text-black/40">How would you like to add this?</p>
               <div className="flex flex-col gap-1.5">
-                <button
-                  onClick={() => handleAdd(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
-                >
-                  <Rss size={11} />
-                  Add to feed
+                <button onClick={() => handleAdd(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
+                  <Rss size={11} /> Add to feed
                 </button>
-                <button
-                  onClick={() => handleAdd(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-black/20 text-black/60 hover:text-black hover:border-black/40 transition-colors"
-                >
-                  <BookOpen size={11} />
-                  Save to list only
+                <button onClick={() => handleAdd(false)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-black/20 text-black/60 hover:text-black hover:border-black/40 transition-colors">
+                  <BookOpen size={11} /> Save to list only
                 </button>
-                <button
-                  onClick={() => setDetect({ status: 'idle' })}
-                  className="text-xs text-black/30 hover:text-black transition-colors text-center py-1"
-                >
+                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
                   Cancel
                 </button>
               </div>
