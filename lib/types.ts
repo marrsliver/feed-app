@@ -45,6 +45,7 @@ export interface UserSource {
   url: string      // website URL (for display/linking)
   feedUrl: string  // RSS/Atom URL (for fetching)
   color: string
+  inFeed: boolean  // whether to pull posts into the feed
   addedAt: number
 }
 

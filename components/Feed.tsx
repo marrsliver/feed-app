@@ -72,7 +72,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
-  const { userSources, addSource, removeSource } = useUserSources()
+  const { userSources, addSource, removeSource, toggleFeed } = useUserSources()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
@@ -124,9 +124,10 @@ export function Feed({ sources, feedId, showSources }: Props) {
     })
   }, [])
 
-  // Parallel queries for user-added RSS sources
+  // Parallel queries — only for sources that are in the feed
+  const feedUserSources = userSources.filter((s) => s.inFeed)
   const userSourceResults = useQueries({
-    queries: userSources.map((source) => ({
+    queries: feedUserSources.map((source) => ({
       queryKey: ['user-source', source.id],
       queryFn: () => fetchUserSourcePosts(source),
       staleTime: 1000 * 60 * 5,
@@ -231,7 +232,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
         <SourceFilter
           sources={[
             ...sources,
-            ...userSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: 'rss' as const, color: s.color })),
+            ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: 'rss' as const, color: s.color })),
           ]}
           active={activeSources}
           onToggle={toggleSource}
@@ -245,6 +246,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
           userSources={userSources}
           onAddSource={addSource}
           onRemoveSource={removeSource}
+          onToggleFeed={toggleFeed}
           onClose={() => setSourcesOpen(false)}
         />
       )}

@@ -44,5 +44,13 @@ export function useUserSources() {
     })
   }, [])
 
-  return { userSources: sources, addSource, removeSource }
+  const toggleFeed = useCallback((id: string) => {
+    setSources((prev) => {
+      const next = prev.map((s) => s.id === id ? { ...s, inFeed: !s.inFeed } : s)
+      save(next)
+      return next
+    })
+  }, [])
+
+  return { userSources: sources, addSource, removeSource, toggleFeed }
 }
