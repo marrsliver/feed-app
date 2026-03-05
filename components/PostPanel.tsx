@@ -113,6 +113,7 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
   const otherFeedLabel = feedId === 'research' ? 'Music Feed' : 'Research Feed'
   const comments = getComments(post.id)
   const [draft, setDraft] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Close on Escape
@@ -213,14 +214,31 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
                   Move to {otherFeedLabel}
                 </button>
               )}
-              {onDelete && (
+              {onDelete && !confirmDelete && (
                 <button
-                  onClick={() => { onDelete(); onClose() }}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 text-xs font-medium text-black/50 hover:border-red-200 hover:text-red-600 hover:border-red-300 transition-colors"
+                  onClick={() => setConfirmDelete(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 text-xs font-medium text-black/50 hover:border-red-300 hover:text-red-600 transition-colors"
                 >
                   <Trash2 size={13} />
                   Delete card
                 </button>
+              )}
+              {confirmDelete && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-black/50">Delete this card?</span>
+                  <button
+                    onClick={() => { onDelete?.(); onClose() }}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-3 py-1.5 text-xs font-medium border border-black/20 text-black/50 hover:text-black transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               )}
             </div>
           </div>

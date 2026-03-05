@@ -24,6 +24,13 @@ export function useManualPosts(feedId: string) {
 
   useEffect(() => { setData(load()) }, [])
 
+  // Re-read when a post is restored from the archive (cross-component event)
+  useEffect(() => {
+    const handler = () => setData(load())
+    window.addEventListener('manual-posts-updated', handler)
+    return () => window.removeEventListener('manual-posts-updated', handler)
+  }, [])
+
   const posts: Post[] = data[feedId] ?? []
 
   const addPost = useCallback((post: Post) => {

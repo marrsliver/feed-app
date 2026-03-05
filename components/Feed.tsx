@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon } from 'lucide-react'
+import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive } from 'lucide-react'
 import type { Post, Source, PostsApiResponse } from '@/lib/types'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
@@ -11,9 +11,10 @@ import { SearchBar } from './SearchBar'
 import { ListsSidebar } from './ListsSidebar'
 import { AskPanel } from './AskPanel'
 import { AddLinkPanel } from './AddLinkPanel'
+import { ArchivePanel } from './ArchivePanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { useManualPosts } from '@/hooks/useManualPosts'
-import { useHiddenPosts } from '@/hooks/useHiddenPosts'
+import { useDeletedPosts } from '@/hooks/useDeletedPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
 interface Props {
@@ -53,10 +54,11 @@ export function Feed({ sources, feedId }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [askOpen, setAskOpen] = useState(false)
   const [addLinkOpen, setAddLinkOpen] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
-  const { hiddenIds, hidePost } = useHiddenPosts()
+  const { deletedPosts, hiddenIds, archivePost, restorePost } = useDeletedPosts()
 
   // Reset to 'all' if active list is deleted
   useEffect(() => {
@@ -135,6 +137,17 @@ export function Feed({ sources, feedId }: Props) {
             Ask
           </button>
 
+          {/* Archive button */}
+          {deletedPosts.length > 0 && (
+            <button
+              onClick={() => setArchiveOpen(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+            >
+              <Archive size={13} />
+              {deletedPosts.length}
+            </button>
+          )}
+
           {/* Lists button / active filter chip */}
           {isFiltering ? (
             <div className="shrink-0 flex items-center border border-black bg-black text-white text-xs font-medium overflow-hidden">
@@ -174,6 +187,15 @@ export function Feed({ sources, feedId }: Props) {
       {/* Add link panel */}
       {addLinkOpen && (
         <AddLinkPanel feedId={feedId} onAdd={addPost} onClose={() => setAddLinkOpen(false)} />
+      )}
+
+      {/* Archive panel */}
+      {archiveOpen && (
+        <ArchivePanel
+          records={deletedPosts}
+          onRestore={restorePost}
+          onClose={() => setArchiveOpen(false)}
+        />
       )}
 
       {/* Ask panel */}
@@ -230,7 +252,10 @@ export function Feed({ sources, feedId }: Props) {
               post={post}
               feedId={feedId}
               onMove={post.sourceId === 'manual' ? () => movePost(post.id, otherFeedId) : undefined}
-              onDelete={() => post.sourceId === 'manual' ? removePost(post.id) : hidePost(post.id)}
+              onDelete={() => {
+                archivePost(post, feedId, post.sourceId === 'manual')
+                if (post.sourceId === 'manual') removePost(post.id)
+              }}
             />
           ))}
         </Masonry>
