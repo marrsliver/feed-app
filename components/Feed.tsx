@@ -102,21 +102,33 @@ export function Feed({ sources }: Props) {
             <SearchBar value={query} onChange={setQuery} />
           </div>
 
-          {/* Lists button */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              isFiltering
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {isFiltering
-              ? <BookmarkCheck size={13} />
-              : <BookmarkIcon size={13} />
-            }
-            {isFiltering ? activeList?.name : 'Lists'}
-          </button>
+          {/* Lists button / active filter chip */}
+          {isFiltering ? (
+            <div className="shrink-0 flex items-center rounded-lg border border-indigo-600 bg-indigo-600 text-white text-xs font-medium overflow-hidden">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 hover:bg-indigo-700 transition-colors"
+              >
+                <BookmarkCheck size={13} />
+                {activeList?.name}
+              </button>
+              <button
+                onClick={() => setView('all')}
+                aria-label="Clear filter"
+                className="pr-2 pl-1 py-1.5 hover:bg-indigo-700 transition-colors text-indigo-200 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-gray-600 border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <BookmarkIcon size={13} />
+              Lists
+            </button>
+          )}
         </div>
 
         <SourceFilter
