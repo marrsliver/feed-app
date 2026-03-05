@@ -7,22 +7,30 @@ function urlId(url: string) {
   return createHash('sha1').update(url).digest('hex').slice(0, 16)
 }
 
-// WordPress REST API fallback — tries common post type slugs when RSS is empty
+// WordPress REST API — tries common post type slugs
 const WP_POST_TYPES = ['posts', 'stories', 'articles', 'news', 'updates', 'blog']
 
-async function tryWordPressApi(baseUrl: string, sourceId: string, sourceName: string, sourceColor: string): Promise<Post[]> {
+async function tryWordPressApi(
+  baseUrl: string,
+  sourceId: string,
+  sourceName: string,
+  sourceColor: string,
+  page: number
+): Promise<{ posts: Post[]; hasMore: boolean }> {
   const headers = { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' }
   for (const type of WP_POST_TYPES) {
     try {
-      const res = await fetch(`${baseUrl}/wp-json/wp/v2/${type}?per_page=20&_embed=1`, {
-        headers,
-        signal: AbortSignal.timeout(6000),
-      })
+      const res = await fetch(
+        `${baseUrl}/wp-json/wp/v2/${type}?per_page=20&page=${page}&_embed=1`,
+        { headers, signal: AbortSignal.timeout(6000) }
+      )
       if (!res.ok) continue
       const items = await res.json()
       if (!Array.isArray(items) || items.length === 0) continue
 
-      return items.map((item: Record<string, unknown>) => {
+      const totalPages = parseInt(res.headers.get('X-WP-TotalPages') ?? '1', 10)
+
+      const posts = items.map((item: Record<string, unknown>) => {
         const title = (item.title as Record<string, string>)?.rendered?.replace(/<[^>]+>/g, '') ?? ''
         const url = (item.link as string) ?? ''
         const date = item.date ? new Date(item.date as string).toISOString() : new Date().toISOString()
@@ -43,9 +51,11 @@ async function tryWordPressApi(baseUrl: string, sourceId: string, sourceName: st
           sourceColor,
         }
       }).filter((p: Post) => p.title && p.url)
+
+      return { posts, hasMore: page < totalPages }
     } catch { /* try next type */ }
   }
-  return []
+  return { posts: [], hasMore: false }
 }
 
 export async function GET(req: Request) {
@@ -54,10 +64,20 @@ export async function GET(req: Request) {
   const sourceId = searchParams.get('sourceId') ?? 'user'
   const sourceName = searchParams.get('sourceName') ?? 'Unknown'
   const sourceColor = searchParams.get('sourceColor') ?? '#6366f1'
+  const page = parseInt(searchParams.get('page') ?? '1', 10)
 
   if (!feedUrl) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
 
   try {
+    const baseUrl = new URL(feedUrl).origin
+
+    // For page 2+, go straight to WordPress REST API (only WP supports REST pagination)
+    if (page > 1) {
+      const { posts, hasMore } = await tryWordPressApi(baseUrl, sourceId, sourceName, sourceColor, page)
+      return NextResponse.json({ posts, hasMore, feedTitle: '' })
+    }
+
+    // Page 1: fetch RSS/Atom feed
     const res = await fetch(feedUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
       signal: AbortSignal.timeout(10000),
@@ -121,14 +141,14 @@ export async function GET(req: Request) {
       })
     })
 
-    // If RSS returned nothing and this is WordPress, try the REST API
+    // If RSS returned nothing and this looks like WordPress, try the REST API
     if (posts.length === 0 && isWordPress) {
-      const baseUrl = new URL(feedUrl).origin
-      const wpPosts = await tryWordPressApi(baseUrl, sourceId, sourceName, sourceColor)
-      return NextResponse.json({ posts: wpPosts, feedTitle })
+      const { posts: wpPosts, hasMore } = await tryWordPressApi(baseUrl, sourceId, sourceName, sourceColor, 1)
+      return NextResponse.json({ posts: wpPosts, feedTitle, hasMore })
     }
 
-    return NextResponse.json({ posts, feedTitle })
+    // RSS returned items — WordPress sites have more pages via REST API
+    return NextResponse.json({ posts, feedTitle, hasMore: isWordPress })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

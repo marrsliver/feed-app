@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss } from 'lucide-react'
@@ -49,17 +49,18 @@ const BREAKPOINTS = {
   640: 1,
 }
 
-async function fetchUserSourcePosts(source: UserSource): Promise<Post[]> {
+async function fetchUserSourcePosts(source: UserSource, page: number): Promise<{ posts: Post[]; hasMore: boolean }> {
   const params = new URLSearchParams({
     url: source.feedUrl,
     sourceId: source.id,
     sourceName: source.name,
     sourceColor: source.color,
+    page: String(page),
   })
   const res = await fetch(`/api/rss?${params}`)
-  if (!res.ok) return []
+  if (!res.ok) return { posts: [], hasMore: false }
   const data = await res.json()
-  return data.posts ?? []
+  return { posts: data.posts ?? [], hasMore: data.hasMore ?? false }
 }
 
 export function Feed({ sources, feedId, showSources }: Props) {
@@ -99,12 +100,6 @@ export function Feed({ sources, feedId, showSources }: Props) {
       enabled: sources.length > 0,
     })
 
-  const loadMore = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) fetchNextPage()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
-
-  const sentinelRef = useInfiniteScroll(loadMore, hasNextPage && !isFetchingNextPage)
-
   // Add newly-added user sources to activeSources automatically
   useEffect(() => {
     setActiveSources((prev) => {
@@ -115,7 +110,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
   }, [userSources])
 
   // Parallel queries — only for sources that are in the feed
-  const feedUserSources = userSources.filter((s) => s.inFeed)
+  const feedUserSources = useMemo(() => userSources.filter((s) => s.inFeed), [userSources])
 
   const allSourceIds = [...sources.map((s) => s.id), ...feedUserSources.map((s) => s.id)]
 
@@ -127,18 +122,61 @@ export function Feed({ sources, feedId, showSources }: Props) {
       return new Set([id])
     })
   }, [allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Paginated user-source fetching
+  const [userSourcePage, setUserSourcePage] = useState(1)
+  const [accumulatedUserPosts, setAccumulatedUserPosts] = useState<Post[]>([])
+  const [userHasMore, setUserHasMore] = useState(false)
+  const processedPages = useRef(new Set<number>())
+  const prevSourceIds = useRef('')
+
+  // Reset accumulated state when the set of feed sources changes
+  useEffect(() => {
+    const ids = feedUserSources.map((s) => s.id).sort().join(',')
+    if (ids === prevSourceIds.current) return
+    prevSourceIds.current = ids
+    setUserSourcePage(1)
+    setAccumulatedUserPosts([])
+    setUserHasMore(feedUserSources.length > 0)
+    processedPages.current = new Set()
+  }, [feedUserSources])
+
   const userSourceResults = useQueries({
     queries: feedUserSources.map((source) => ({
-      queryKey: ['user-source', source.id],
-      queryFn: () => fetchUserSourcePosts(source),
+      queryKey: ['user-source', source.id, userSourcePage],
+      queryFn: () => fetchUserSourcePosts(source, userSourcePage),
       staleTime: 1000 * 60 * 5,
     })),
   })
-  const userSourcePosts: Post[] = userSourceResults.flatMap((r) => r.data ?? [])
+
+  // Accumulate results when all queries for the current page complete
+  useEffect(() => {
+    if (feedUserSources.length === 0) return
+    if (userSourceResults.some((r) => r.isPending)) return
+    if (processedPages.current.has(userSourcePage)) return
+    processedPages.current.add(userSourcePage)
+    const newPosts = userSourceResults.flatMap((r) => r.data?.posts ?? [])
+    const anyHasMore = userSourceResults.some((r) => r.data?.hasMore ?? false)
+    setAccumulatedUserPosts((prev) => [...prev, ...newPosts])
+    setUserHasMore(anyHasMore)
+  }, [userSourceResults, userSourcePage, feedUserSources.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const userSourcesLoading = userSourceResults.some((r) => r.isPending)
+
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage()
+    } else if (userHasMore && !userSourcesLoading) {
+      setUserSourcePage((p) => p + 1)
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, userHasMore, userSourcesLoading])
+
+  const canLoadMore = (hasNextPage && !isFetchingNextPage) || (userHasMore && !userSourcesLoading)
+  const sentinelRef = useInfiniteScroll(loadMore, canLoadMore)
 
   const fetchedPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
   const seenIds = new Set<string>()
-  const allPosts: Post[] = [...manualPosts, ...fetchedPosts, ...userSourcePosts]
+  const allPosts: Post[] = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
     .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
