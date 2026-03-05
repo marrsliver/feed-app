@@ -32,6 +32,13 @@ export interface PostsApiResponse {
   hasMore: boolean
 }
 
+export interface Comment {
+  id: string
+  postId: string
+  text: string
+  createdAt: number
+}
+
 export interface SavedList {
   id: string
   name: string
