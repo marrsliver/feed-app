@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive } from 'lucide-react'
-import type { Post, Source, PostsApiResponse } from '@/lib/types'
+import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss } from 'lucide-react'
+import type { Post, Source, UserSource, PostsApiResponse } from '@/lib/types'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
 import { SearchBar } from './SearchBar'
@@ -12,7 +12,9 @@ import { ListsSidebar } from './ListsSidebar'
 import { AskPanel } from './AskPanel'
 import { AddLinkPanel } from './AddLinkPanel'
 import { ArchivePanel } from './ArchivePanel'
+import { SourcesSidebar } from './SourcesSidebar'
 import { useSavedLists } from '@/hooks/useSavedLists'
+import { useUserSources } from '@/hooks/useUserSources'
 import { useManualPosts } from '@/hooks/useManualPosts'
 import { useDeletedPosts } from '@/hooks/useDeletedPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
@@ -20,6 +22,7 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 interface Props {
   sources: Source[]
   feedId: string
+  showSources?: boolean
 }
 
 async function fetchPosts(
@@ -45,7 +48,20 @@ const BREAKPOINTS = {
   640: 1,
 }
 
-export function Feed({ sources, feedId }: Props) {
+async function fetchUserSourcePosts(source: UserSource): Promise<Post[]> {
+  const params = new URLSearchParams({
+    url: source.feedUrl,
+    sourceId: source.id,
+    sourceName: source.name,
+    sourceColor: source.color,
+  })
+  const res = await fetch(`/api/rss?${params}`)
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.posts ?? []
+}
+
+export function Feed({ sources, feedId, showSources }: Props) {
   const [activeSources, setActiveSources] = useState<Set<string>>(
     new Set(sources.map((s) => s.id))
   )
@@ -55,6 +71,8 @@ export function Feed({ sources, feedId }: Props) {
   const [askOpen, setAskOpen] = useState(false)
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [sourcesOpen, setSourcesOpen] = useState(false)
+  const { userSources, addSource, removeSource } = useUserSources()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
@@ -85,6 +103,15 @@ export function Feed({ sources, feedId }: Props) {
 
   const sentinelRef = useInfiniteScroll(loadMore, hasNextPage && !isFetchingNextPage)
 
+  // Add newly-added user sources to activeSources automatically
+  useEffect(() => {
+    setActiveSources((prev) => {
+      const next = new Set(prev)
+      userSources.forEach((s) => next.add(s.id))
+      return next
+    })
+  }, [userSources])
+
   const toggleSource = useCallback((id: string) => {
     setActiveSources((prev) => {
       const next = new Set(prev)
@@ -97,11 +124,24 @@ export function Feed({ sources, feedId }: Props) {
     })
   }, [])
 
+  // Parallel queries for user-added RSS sources
+  const userSourceResults = useQueries({
+    queries: userSources.map((source) => ({
+      queryKey: ['user-source', source.id],
+      queryFn: () => fetchUserSourcePosts(source),
+      staleTime: 1000 * 60 * 5,
+    })),
+  })
+  const userSourcePosts: Post[] = userSourceResults.flatMap((r) => r.data ?? [])
+
   const fetchedPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
   const allPosts: Post[] = [
     ...manualPosts,
     ...fetchedPosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
-  ].filter((p) => !hiddenIds.includes(p.id))
+    ...userSourcePosts.filter((p) => !manualPosts.some((m) => m.id === p.id)),
+  ]
+    .filter((p) => !hiddenIds.includes(p.id))
+    .filter((p) => activeSources.has(p.sourceId))
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
@@ -118,6 +158,17 @@ export function Feed({ sources, feedId }: Props) {
           <div className="flex-1">
             <SearchBar value={query} onChange={setQuery} />
           </div>
+
+          {/* Sources button — research feed only */}
+          {showSources && (
+            <button
+              onClick={() => setSourcesOpen(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+            >
+              <Rss size={13} />
+              Sources
+            </button>
+          )}
 
           {/* Add link button */}
           <button
@@ -178,11 +229,25 @@ export function Feed({ sources, feedId }: Props) {
         </div>
 
         <SourceFilter
-          sources={sources}
+          sources={[
+            ...sources,
+            ...userSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: 'rss' as const, color: s.color })),
+          ]}
           active={activeSources}
           onToggle={toggleSource}
         />
       </div>
+
+      {/* Sources sidebar */}
+      {sourcesOpen && (
+        <SourcesSidebar
+          staticSources={sources}
+          userSources={userSources}
+          onAddSource={addSource}
+          onRemoveSource={removeSource}
+          onClose={() => setSourcesOpen(false)}
+        />
+      )}
 
       {/* Add link panel */}
       {addLinkOpen && (

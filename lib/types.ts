@@ -39,6 +39,15 @@ export interface Comment {
   createdAt: number
 }
 
+export interface UserSource {
+  id: string
+  name: string
+  url: string      // website URL (for display/linking)
+  feedUrl: string  // RSS/Atom URL (for fetching)
+  color: string
+  addedAt: number
+}
+
 export interface SavedList {
   id: string
   name: string
