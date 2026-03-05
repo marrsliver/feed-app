@@ -56,7 +56,7 @@ export function AskPanel({ posts, onClose }: Props) {
     }
   }
 
-  const suggestedPosts = response?.suggestions
+  const suggestedPosts = (response?.suggestions ?? [])
     .map((s) => ({ post: posts.find((p) => p.id === s.postId), reason: s.reason }))
     .filter((s): s is { post: Post; reason: string } => !!s.post)
 

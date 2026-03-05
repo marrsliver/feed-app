@@ -56,9 +56,12 @@ Only suggest articles that genuinely match. If nothing fits well, return fewer s
 
     const raw = message.content[0].type === 'text' ? message.content[0].text : ''
 
-    // Strip markdown code fences if present
-    const cleaned = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim()
-    const result = JSON.parse(cleaned)
+    // Strip markdown code fences and extract JSON
+    const cleaned = raw.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('No JSON found in response')
+    const result = JSON.parse(jsonMatch[0])
+    if (!result.suggestions) result.suggestions = []
 
     return NextResponse.json(result)
   } catch (err) {
