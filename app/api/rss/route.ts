@@ -38,6 +38,7 @@ async function tryWordPressApi(
         const embedded = item._embedded as Record<string, unknown> | undefined
         const media = embedded?.['wp:featuredmedia']
         const image = Array.isArray(media) ? (media[0] as Record<string, string>)?.source_url : undefined
+        const commentCount = parseInt((item.comment_count as string) ?? '0', 10) || 0
 
         return {
           id: `${sourceId}-${urlId(url)}`,
@@ -46,6 +47,7 @@ async function tryWordPressApi(
           date,
           excerpt: excerpt || undefined,
           image,
+          commentCount: commentCount > 0 ? commentCount : undefined,
           sourceId,
           sourceName,
           sourceColor,
@@ -128,6 +130,11 @@ export async function GET(req: Request) {
         if (imgMatch) image = imgMatch[1]
       }
 
+      // slash:comments gives the comment count in WordPress RSS feeds
+      const itemXml = $.html(el)
+      const slashMatch = itemXml.match(/<slash:comments>(\d+)<\/slash:comments>/i)
+      const commentCount = slashMatch ? parseInt(slashMatch[1], 10) : undefined
+
       posts.push({
         id: `${sourceId}-${urlId(link)}`,
         title,
@@ -135,6 +142,7 @@ export async function GET(req: Request) {
         date: date ? new Date(date).toISOString() : new Date().toISOString(),
         excerpt: excerpt || undefined,
         image,
+        commentCount,
         sourceId,
         sourceName,
         sourceColor,

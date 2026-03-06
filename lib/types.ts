@@ -8,6 +8,7 @@ export interface Post {
   sourceId: string
   sourceName: string
   sourceColor: string
+  commentCount?: number
 }
 
 export interface Source {

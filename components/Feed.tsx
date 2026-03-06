@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss } from 'lucide-react'
 import type { Post, Source, UserSource, PostsApiResponse } from '@/lib/types'
+import { rankPosts } from '@/lib/rankPosts'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
 import { SearchBar } from './SearchBar'
@@ -176,11 +177,11 @@ export function Feed({ sources, feedId, showSources }: Props) {
 
   const fetchedPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
   const seenIds = new Set<string>()
-  const allPosts: Post[] = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
+  const filtered = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
     .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const allPosts = rankPosts(filtered)
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
