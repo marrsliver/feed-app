@@ -5,7 +5,7 @@ import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss } from 'lucide-react'
 import type { Post, Source, UserSource, PostsApiResponse } from '@/lib/types'
-import { rankPosts, type SortMode } from '@/lib/rankPosts'
+import { rankPosts } from '@/lib/rankPosts'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
 import { SearchBar } from './SearchBar'
@@ -76,11 +76,6 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
-  const [sortMode, setSortMode] = useState<SortMode>('relevance')
-  const handleSortMode = useCallback((mode: SortMode) => {
-    setSortMode(mode)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
   const { userSources, addSource, removeSource, toggleFeed } = useUserSources()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
@@ -186,7 +181,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
     .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
-  const allPosts = rankPosts(filtered, sortMode)
+  const allPosts = rankPosts(filtered)
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
@@ -282,24 +277,6 @@ export function Feed({ sources, feedId, showSources }: Props) {
             active={activeSources}
             onToggle={toggleSource}
           />
-          <div className="flex items-center gap-0.5 shrink-0">
-            {([
-              { id: 'relevance', label: 'Relevant' },
-              { id: 'popular',   label: 'Popular' },
-            ] as { id: SortMode; label: string }[]).map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => handleSortMode(id)}
-                className={`px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest transition-colors ${
-                  sortMode === id
-                    ? 'text-black border-b border-black'
-                    : 'text-black/30 hover:text-black/60'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
