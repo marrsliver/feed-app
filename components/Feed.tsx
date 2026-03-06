@@ -180,6 +180,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
     .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   const activeList = lists.find((l) => l.id === view)
   const displayPosts =
     view === 'all'
