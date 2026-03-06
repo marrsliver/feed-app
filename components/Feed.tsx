@@ -77,6 +77,10 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('relevance')
+  const handleSortMode = useCallback((mode: SortMode) => {
+    setSortMode(mode)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
   const { userSources, addSource, removeSource, toggleFeed } = useUserSources()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
@@ -281,13 +285,11 @@ export function Feed({ sources, feedId, showSources }: Props) {
           <div className="flex items-center gap-0.5 shrink-0">
             {([
               { id: 'relevance', label: 'Relevant' },
-              { id: 'recency',   label: 'Recent' },
               { id: 'popular',   label: 'Popular' },
-              { id: 'unpopular', label: 'Quiet' },
             ] as { id: SortMode; label: string }[]).map(({ id, label }) => (
               <button
                 key={id}
-                onClick={() => setSortMode(id)}
+                onClick={() => handleSortMode(id)}
                 className={`px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest transition-colors ${
                   sortMode === id
                     ? 'text-black border-b border-black'
