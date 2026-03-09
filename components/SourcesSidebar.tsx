@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { X, Plus, Trash2, Loader2, Rss, BookOpen } from 'lucide-react'
-import type { Source, UserSource } from '@/lib/types'
+import type { LibrarySource, SourceCategory } from '@/lib/types'
 
 interface Props {
-  staticSources: Source[]
-  userSources: UserSource[]
-  onAddSource: (source: Omit<UserSource, 'color' | 'addedAt'>) => void
+  feedId: string
+  staticSources: LibrarySource[]
+  userSources: LibrarySource[]
+  categories: SourceCategory[]
+  onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => void
   onRemoveSource: (id: string) => void
   onToggleFeed: (id: string) => void
   onClose: () => void
@@ -18,6 +20,8 @@ type DetectState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'found'; feedUrl: string; title: string; siteUrl: string }
+  | { status: 'categorizing'; feedUrl: string; title: string; siteUrl: string }
+  | { status: 'confirm'; feedUrl: string; title: string; siteUrl: string; suggestedCategoryId: string | null; confidence: 'high' | 'medium' | 'low' }
   | { status: 'error'; message: string }
 
 type TabView = 'library' | 'feed' | 'list'
@@ -26,9 +30,10 @@ type DisplaySource =
   | { kind: 'static'; id: string; name: string; url: string; color: string }
   | { kind: 'user'; id: string; name: string; url: string; color: string; inFeed: boolean }
 
-export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemoveSource, onToggleFeed, onClose, onShowCards }: Props) {
+export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onClose, onShowCards }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
   const [tab, setTab] = useState<TabView>('library')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -46,7 +51,28 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
       if (!res.ok || data.error) {
         setDetect({ status: 'error', message: 'No RSS feed found. Try pasting the RSS URL directly.' })
       } else {
-        setDetect({ status: 'found', feedUrl: data.feedUrl, title: data.title || new URL(url).hostname, siteUrl: url })
+        const title = data.title || new URL(url).hostname
+        const foundState = { feedUrl: data.feedUrl, title, siteUrl: url }
+        setDetect({ status: 'categorizing', ...foundState })
+        // Suggest category
+        try {
+          const catRes = await fetch('/api/suggest-category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: title, url, availableCategories: categories }),
+          })
+          const catData = await catRes.json()
+          setSelectedCategoryId(catData.categoryId ?? '')
+          setDetect({
+            status: 'confirm',
+            ...foundState,
+            suggestedCategoryId: catData.categoryId ?? null,
+            confidence: catData.confidence ?? 'low',
+          })
+        } catch {
+          setDetect({ status: 'confirm', ...foundState, suggestedCategoryId: null, confidence: 'low' })
+          setSelectedCategoryId('')
+        }
       }
     } catch {
       setDetect({ status: 'error', message: 'Something went wrong. Check the URL and try again.' })
@@ -54,10 +80,20 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
   }
 
   function handleAdd(inFeed: boolean) {
-    if (detect.status !== 'found') return
-    onAddSource({ id: `user-${Date.now()}`, name: detect.title, url: detect.siteUrl, feedUrl: detect.feedUrl, inFeed })
+    if (detect.status !== 'confirm') return
+    onAddSource({
+      id: `user-${Date.now()}`,
+      name: detect.title,
+      url: detect.siteUrl,
+      feedUrl: detect.feedUrl,
+      type: 'rss',
+      inFeed,
+      feedGroup: feedId,
+      categoryId: selectedCategoryId || undefined,
+    })
     setInputUrl('')
     setDetect({ status: 'idle' })
+    setSelectedCategoryId('')
   }
 
   // Build display lists
@@ -77,6 +113,8 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
     { id: 'feed', label: 'In Feed' },
     { id: 'list', label: 'List Only' },
   ]
+
+  const isLoading = detect.status === 'loading' || detect.status === 'categorizing'
 
   return (
     <>
@@ -135,7 +173,6 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
                     >
                       {s.name}
                     </a>
-                    {/* Subtitle only shown in In Feed tab */}
                     {tab === 'feed' && (
                       <span className="text-[9px] text-black/25 uppercase tracking-widest">
                         {s.kind === 'static' ? 'Built-in' : 'User added'}
@@ -172,12 +209,34 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
         <div className="px-4 py-4 border-t border-black/10 space-y-3">
           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30">Add a source</p>
 
-          {detect.status === 'found' ? (
-            <div className="space-y-2">
+          {detect.status === 'confirm' ? (
+            <div className="space-y-3">
+              {/* Source info */}
               <div className="px-3 py-2 bg-black/5 text-sm">
                 <p className="font-medium text-black truncate">{detect.title}</p>
                 <p className="text-[10px] text-black/40 truncate mt-0.5">{detect.feedUrl}</p>
               </div>
+
+              {/* Category selector */}
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">
+                  Category
+                  {detect.suggestedCategoryId && detect.confidence !== 'high' && (
+                    <span className="ml-1 text-black/25 normal-case">· low confidence</span>
+                  )}
+                </p>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+                >
+                  <option value="">— None —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <p className="text-[10px] text-black/40">How would you like to add this?</p>
               <div className="flex flex-col gap-1.5">
                 <button onClick={() => handleAdd(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
@@ -204,12 +263,15 @@ export function SourcesSidebar({ staticSources, userSources, onAddSource, onRemo
                 />
                 <button
                   onClick={handleDetect}
-                  disabled={!inputUrl.trim() || detect.status === 'loading'}
+                  disabled={!inputUrl.trim() || isLoading}
                   className="px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30"
                 >
-                  {detect.status === 'loading' ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                 </button>
               </div>
+              {detect.status === 'categorizing' && (
+                <p className="text-[10px] text-black/40">Suggesting category…</p>
+              )}
               {detect.status === 'error' && (
                 <p className="text-[10px] text-red-500">{detect.message}</p>
               )}

@@ -6,7 +6,7 @@ export default function MiscFeed() {
     <main className="min-h-screen">
       <Header activeFeed="misc" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Feed sources={[]} feedId="misc" />
+        <Feed feedId="misc" />
       </div>
     </main>
   )

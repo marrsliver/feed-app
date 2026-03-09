@@ -5,18 +5,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const body = await req.json()
   const update: Record<string, unknown> = {}
-  if (body.inFeed !== undefined) update.in_feed = body.inFeed
-  if (body.categoryId !== undefined) update.category_id = body.categoryId
-  if (body.tags !== undefined) update.tags = body.tags
   if (body.name !== undefined) update.name = body.name
-  const { error } = await getSupabase().from('user_sources').update(update).eq('id', id)
+  if (body.sourceIds !== undefined) update.source_ids = body.sourceIds
+  const { error } = await getSupabase().from('source_lists').update(update).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { error } = await getSupabase().from('user_sources').delete().eq('id', id)
+  const { error } = await getSupabase().from('source_lists').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

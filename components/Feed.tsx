@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss } from 'lucide-react'
-import type { Post, Source, UserSource, PostsApiResponse } from '@/lib/types'
+import type { LibrarySource, PostsApiResponse, Post } from '@/lib/types'
 import { rankPosts } from '@/lib/rankPosts'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
@@ -16,13 +16,14 @@ import { ArchivePanel } from './ArchivePanel'
 import { SourcesSidebar } from './SourcesSidebar'
 import { SourcesCardsView } from './SourcesCardsView'
 import { useSavedLists } from '@/hooks/useSavedLists'
-import { useUserSources } from '@/hooks/useUserSources'
+import { useLibrarySources } from '@/hooks/useLibrarySources'
+import { useSourceLists } from '@/hooks/useSourceLists'
+import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useManualPosts } from '@/hooks/useManualPosts'
 import { useDeletedPosts } from '@/hooks/useDeletedPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
 interface Props {
-  sources: Source[]
   feedId: string
   showSources?: boolean
 }
@@ -50,7 +51,7 @@ const BREAKPOINTS = {
   640: 1,
 }
 
-async function fetchUserSourcePosts(source: UserSource, page: number): Promise<{ posts: Post[]; hasMore: boolean }> {
+async function fetchUserSourcePosts(source: LibrarySource, page: number): Promise<{ posts: Post[]; hasMore: boolean }> {
   const params = new URLSearchParams({
     url: source.feedUrl,
     sourceId: source.id,
@@ -64,10 +65,8 @@ async function fetchUserSourcePosts(source: UserSource, page: number): Promise<{
   return { posts: data.posts ?? [], hasMore: data.hasMore ?? false }
 }
 
-export function Feed({ sources, feedId, showSources }: Props) {
-  const [activeSources, setActiveSources] = useState<Set<string>>(
-    new Set(sources.map((s) => s.id))
-  )
+export function Feed({ feedId, showSources }: Props) {
+  const [activeSources, setActiveSources] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [view, setView] = useState<string>('all')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -76,11 +75,55 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
-  const { userSources, addSource, removeSource, toggleFeed } = useUserSources()
+
+  const {
+    sources: allSources,
+    staticSources,
+    userSources,
+    allTags,
+    loaded: sourcesLoaded,
+    addSource,
+    removeSource,
+    toggleFeed,
+    setCategory,
+    addTag,
+    removeTag,
+  } = useLibrarySources()
+
+  const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
+  const { categories } = useSourceCategories()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
   const { deletedPosts, hiddenIds, archivePost, restorePost } = useDeletedPosts()
+
+  // Static sources for this feed group
+  const feedStaticSources = useMemo(
+    () => staticSources.filter((s) => s.feedGroup === feedId),
+    [staticSources, feedId]
+  )
+
+  // User sources in the feed (non-static, inFeed=true)
+  const feedUserSources = useMemo(() => userSources.filter((s) => s.inFeed), [userSources])
+
+  const allSourceIds = useMemo(
+    () => [...feedStaticSources.map((s) => s.id), ...feedUserSources.map((s) => s.id)],
+    [feedStaticSources, feedUserSources]
+  )
+
+  // Populate activeSources when library loads
+  useEffect(() => {
+    if (!sourcesLoaded) return
+    setActiveSources((prev) => {
+      if (prev.size > 0) {
+        // Add any newly-added sources
+        const next = new Set(prev)
+        allSourceIds.forEach((id) => next.add(id))
+        return next
+      }
+      return new Set(allSourceIds)
+    })
+  }, [sourcesLoaded, allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset to 'all' if active list is deleted
   useEffect(() => {
@@ -98,28 +141,12 @@ export function Feed({ sources, feedId, showSources }: Props) {
         fetchPosts(pageParam as number, activeSourcesList, query),
       initialPageParam: 1,
       getNextPageParam: (last) => last.nextPage ?? undefined,
-      enabled: sources.length > 0,
+      enabled: feedStaticSources.length > 0,
     })
-
-  // Add newly-added user sources to activeSources automatically
-  useEffect(() => {
-    setActiveSources((prev) => {
-      const next = new Set(prev)
-      userSources.forEach((s) => next.add(s.id))
-      return next
-    })
-  }, [userSources])
-
-  // Parallel queries — only for sources that are in the feed
-  const feedUserSources = useMemo(() => userSources.filter((s) => s.inFeed), [userSources])
-
-  const allSourceIds = [...sources.map((s) => s.id), ...feedUserSources.map((s) => s.id)]
 
   const toggleSource = useCallback((id: string) => {
     setActiveSources((prev) => {
-      // If this is the only active source, reset to all
       if (prev.size === 1 && prev.has(id)) return new Set(allSourceIds)
-      // Otherwise isolate this source
       return new Set([id])
     })
   }, [allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -131,7 +158,6 @@ export function Feed({ sources, feedId, showSources }: Props) {
   const processedPages = useRef(new Set<number>())
   const prevSourceIds = useRef('')
 
-  // Reset accumulated state when the set of feed sources changes
   useEffect(() => {
     const ids = feedUserSources.map((s) => s.id).sort().join(',')
     if (ids === prevSourceIds.current) return
@@ -150,7 +176,6 @@ export function Feed({ sources, feedId, showSources }: Props) {
     })),
   })
 
-  // Accumulate results when all queries for the current page complete
   useEffect(() => {
     if (feedUserSources.length === 0) return
     if (userSourceResults.some((r) => r.isPending)) return
@@ -189,6 +214,12 @@ export function Feed({ sources, feedId, showSources }: Props) {
       : allPosts.filter((p) => activeList?.postIds.includes(p.id))
 
   const isFiltering = view !== 'all'
+
+  // Sources for the filter bar (static + user in-feed for this feedId)
+  const filterSources = useMemo(() => [
+    ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl })),
+    ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl })),
+  ], [feedStaticSources, feedUserSources])
 
   return (
     <div className="space-y-4">
@@ -270,10 +301,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
 
         <div className="flex items-center justify-between gap-4">
           <SourceFilter
-            sources={[
-              ...sources,
-              ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: 'rss' as const, color: s.color })),
-            ]}
+            sources={filterSources}
             active={activeSources}
             onToggle={toggleSource}
           />
@@ -283,8 +311,10 @@ export function Feed({ sources, feedId, showSources }: Props) {
       {/* Sources sidebar */}
       {sourcesOpen && (
         <SourcesSidebar
-          staticSources={sources}
+          feedId={feedId}
+          staticSources={feedStaticSources}
           userSources={userSources}
+          categories={categories}
           onAddSource={addSource}
           onRemoveSource={removeSource}
           onToggleFeed={toggleFeed}
@@ -296,8 +326,15 @@ export function Feed({ sources, feedId, showSources }: Props) {
       {/* Sources cards view */}
       {sourcesCardsOpen && (
         <SourcesCardsView
-          staticSources={sources}
-          userSources={userSources}
+          sources={allSources}
+          categories={categories}
+          allTags={allTags}
+          sourceLists={sourceLists}
+          onSetCategory={setCategory}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onToggleSourceInList={toggleSourceInList}
+          onCreateSourceList={createSourceList}
           onClose={() => setSourcesCardsOpen(false)}
         />
       )}
@@ -335,7 +372,7 @@ export function Feed({ sources, feedId, showSources }: Props) {
       )}
 
       {/* Status */}
-      {status === 'pending' && sources.length > 0 && (
+      {status === 'pending' && feedStaticSources.length > 0 && (
         <div className="flex justify-center py-20">
           <Loader2 className="animate-spin text-indigo-500" size={32} />
         </div>
@@ -347,11 +384,11 @@ export function Feed({ sources, feedId, showSources }: Props) {
         </div>
       )}
 
-      {(status === 'success' || sources.length === 0) && displayPosts.length === 0 && (
+      {(status === 'success' || feedStaticSources.length === 0) && displayPosts.length === 0 && (
         <div className="text-center py-20 text-black/25 text-sm">
           {view !== 'all'
             ? `No posts saved to "${activeList?.name}" yet.`
-            : sources.length === 0
+            : feedStaticSources.length === 0
             ? 'Add links using the Add button above.'
             : 'No posts found.'}
         </div>

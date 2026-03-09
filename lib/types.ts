@@ -11,14 +11,39 @@ export interface Post {
   commentCount?: number
 }
 
-export interface Source {
+export interface LibrarySource {
   id: string
   name: string
   url: string
-  type: 'rss' | 'wordpress' | 'custom' | 'scrape'
+  feedUrl: string
   color: string
+  type: 'rss' | 'wordpress' | 'custom' | 'scrape'
+  apiPath?: string
+  inFeed: boolean
+  addedAt: number
+  isStatic: boolean
+  feedGroup?: string
+  categoryId?: string
+  tags: string[]
+}
+
+// Aliases for transition compatibility
+export type Source = Pick<LibrarySource, 'id' | 'name' | 'url' | 'type' | 'color'> & {
   apiPath?: string
   feedUrl?: string
+}
+export type UserSource = LibrarySource
+
+export interface SourceCategory {
+  id: string
+  name: string
+}
+
+export interface SourceList {
+  id: string
+  name: string
+  sourceIds: string[]
+  createdAt: number
 }
 
 export interface FetcherResult {
@@ -38,16 +63,6 @@ export interface Comment {
   postId: string
   text: string
   createdAt: number
-}
-
-export interface UserSource {
-  id: string
-  name: string
-  url: string      // website URL (for display/linking)
-  feedUrl: string  // RSS/Atom URL (for fetching)
-  color: string
-  inFeed: boolean  // whether to pull posts into the feed
-  addedAt: number
 }
 
 export interface SavedList {

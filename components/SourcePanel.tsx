@@ -1,17 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, ArrowUpRight, Pencil, Check, Trash2 } from 'lucide-react'
+import { X, ArrowUpRight, Pencil, Check, Trash2, Plus } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
-
-interface SourceCard {
-  id: string
-  name: string
-  url: string
-  color: string
-  kind: 'static' | 'user'
-  inFeed?: boolean
-}
+import type { LibrarySource, SourceCategory } from '@/lib/types'
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -86,14 +78,22 @@ function NoteRow({
 }
 
 interface Props {
-  source: SourceCard
+  source: LibrarySource
+  categories: SourceCategory[]
+  allTags: string[]
+  onSetCategory: (id: string, categoryId: string | null) => void
+  onAddTag: (id: string, tag: string) => void
+  onRemoveTag: (id: string, tag: string) => void
+  onPromoteTag: (tag: string) => void
   onClose: () => void
 }
 
-export function SourcePanel({ source, onClose }: Props) {
+export function SourcePanel({ source, categories, allTags, onSetCategory, onAddTag, onRemoveTag, onPromoteTag, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
+  const [tagInput, setTagInput] = useState('')
+  const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -110,6 +110,18 @@ export function SourcePanel({ source, onClose }: Props) {
     setDraft('')
   }
 
+  function handleAddTag(tag: string) {
+    const t = tag.trim().toLowerCase()
+    if (!t) return
+    onAddTag(source.id, t)
+    setTagInput('')
+    setTagSuggestionsOpen(false)
+  }
+
+  const filteredSuggestions = tagInput.trim()
+    ? allTags.filter((t) => t.includes(tagInput.toLowerCase()) && !source.tags.includes(t))
+    : []
+
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[1px]" onClick={onClose} />
@@ -121,7 +133,7 @@ export function SourcePanel({ source, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
           <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
-            {source.kind === 'static' ? 'Built-in source' : 'User-added source'}
+            {source.isStatic ? 'Built-in source' : 'User-added source'}
           </span>
           <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
             <X size={16} />
@@ -136,21 +148,98 @@ export function SourcePanel({ source, onClose }: Props) {
               {source.name}
             </h2>
 
+            {/* Category selector */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
+                Category
+              </label>
+              <select
+                value={source.categoryId ?? ''}
+                onChange={(e) => onSetCategory(source.id, e.target.value || null)}
+                className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+              >
+                <option value="">— None —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Tags */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
+                Tags
+              </label>
+              {source.tags.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {source.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-0.5 text-[9px] text-black/50 border border-black/15 px-1.5 py-0.5"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => onRemoveTag(source.id, tag)}
+                        className="text-black/25 hover:text-black/60 transition-colors leading-none ml-0.5"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                      <button
+                        onClick={() => onPromoteTag(tag)}
+                        title="Promote to category"
+                        className="text-black/20 hover:text-black/50 transition-colors leading-none ml-0.5"
+                        aria-label={`Promote ${tag} to category`}
+                      >
+                        ↑
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="relative flex gap-1.5">
+                <input
+                  value={tagInput}
+                  onChange={(e) => { setTagInput(e.target.value); setTagSuggestionsOpen(true) }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput) }
+                    if (e.key === 'Escape') setTagSuggestionsOpen(false)
+                  }}
+                  onFocus={() => setTagSuggestionsOpen(true)}
+                  placeholder="Add a tag…"
+                  className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                />
+                <button
+                  onClick={() => handleAddTag(tagInput)}
+                  disabled={!tagInput.trim()}
+                  className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/40 hover:text-black transition-colors disabled:opacity-30"
+                >
+                  <Plus size={11} />
+                </button>
+                {tagSuggestionsOpen && filteredSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-0.5 bg-white border border-black/15 z-10 shadow-sm max-h-32 overflow-y-auto">
+                    {filteredSuggestions.map((t) => (
+                      <button
+                        key={t}
+                        onMouseDown={(e) => { e.preventDefault(); handleAddTag(t) }}
+                        className="block w-full text-left px-3 py-1.5 text-[10px] text-black/70 hover:bg-black/5 transition-colors"
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Status pills */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 border border-black/10 px-1.5 py-0.5">
-                {source.kind === 'static' ? 'Built-in' : 'User added'}
+                {source.isStatic ? 'Built-in' : 'User added'}
               </span>
-              {source.kind === 'user' && (
-                <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${source.inFeed ? 'border-black/20 text-black/50' : 'border-black/10 text-black/25'}`}>
-                  {source.inFeed ? 'In feed' : 'List only'}
-                </span>
-              )}
-              {source.kind === 'static' && (
-                <span className="text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border border-black/20 text-black/50">
-                  In feed
-                </span>
-              )}
+              <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${source.inFeed ? 'border-black/20 text-black/50' : 'border-black/10 text-black/25'}`}>
+                {source.inFeed ? 'In feed' : 'List only'}
+              </span>
             </div>
 
             {/* Open button */}
