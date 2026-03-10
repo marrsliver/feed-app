@@ -34,7 +34,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Pro
     <>
       <div className="break-inside-avoid mb-4">
         <div
-          onClick={() => { onRead?.(); setPanelOpen(true) }}
+          onClick={() => setPanelOpen(true)}
           className="group block bg-white overflow-hidden transition-all duration-300 cursor-pointer"
           style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
           onMouseEnter={(e) => {
@@ -91,7 +91,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Pro
         </div>
       </div>
 
-      {panelOpen && <PostPanel post={post} feedId={feedId} onMove={onMove} onDelete={onDelete} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <PostPanel post={post} feedId={feedId} onRead={onRead} onMove={onMove} onDelete={onDelete} onClose={() => setPanelOpen(false)} />}
     </>
   )
 }

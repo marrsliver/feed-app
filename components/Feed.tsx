@@ -153,8 +153,18 @@ export function Feed({ feedId, showSources }: Props) {
 
   const toggleSource = useCallback((id: string) => {
     setActiveSources((prev) => {
-      if (prev.size === 1 && prev.has(id)) return new Set(allSourceIds)
-      return new Set([id])
+      // If all are active, first click spotlights just this source
+      if (prev.size === allSourceIds.length) return new Set([id])
+      // Otherwise multi-select: toggle this source in/out
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+        // Deselecting the last one resets to all
+        if (next.size === 0) return new Set(allSourceIds)
+      } else {
+        next.add(id)
+      }
+      return next
     })
   }, [allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 

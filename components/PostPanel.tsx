@@ -10,6 +10,7 @@ import { BookmarkButton } from './BookmarkButton'
 interface Props {
   post: Post
   feedId?: string
+  onRead?: () => void
   onMove?: () => void
   onDelete?: () => void
   onClose: () => void
@@ -107,7 +108,7 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
+export function PostPanel({ post, feedId, onRead, onMove, onDelete, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const isManual = post.sourceId === 'manual'
   const otherFeedLabel = feedId === 'research' ? 'Music Feed' : 'Research Feed'
@@ -208,6 +209,7 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
                 href={post.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => onRead?.()}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
               >
                 Open article
