@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { SavedList } from '@/lib/types'
+import type { SavedList, Post } from '@/lib/types'
 
 export function useSavedLists() {
   const [lists, setLists] = useState<SavedList[]>([])
@@ -15,7 +15,7 @@ export function useSavedLists() {
 
   const createList = useCallback((name: string): string => {
     const id = Date.now().toString()
-    const newList: SavedList = { id, name: name.trim(), postIds: [], createdAt: Date.now() }
+    const newList: SavedList = { id, name: name.trim(), postIds: [], postData: {}, createdAt: Date.now() }
     setLists((prev) => [...prev, newList])
     fetch('/api/db/lists', {
       method: 'POST',
@@ -39,18 +39,24 @@ export function useSavedLists() {
     }).catch(() => {})
   }, [])
 
-  const togglePostInList = useCallback((listId: string, postId: string) => {
+  const togglePostInList = useCallback((listId: string, postId: string, post?: Post) => {
     setLists((prev) => {
       const next = prev.map((l) => {
         if (l.id !== listId) return l
         const has = l.postIds.includes(postId)
         const postIds = has ? l.postIds.filter((id) => id !== postId) : [...l.postIds, postId]
+        const postData = { ...(l.postData ?? {}) }
+        if (has) {
+          delete postData[postId]
+        } else if (post) {
+          postData[postId] = post
+        }
         fetch(`/api/db/lists/${listId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postIds }),
+          body: JSON.stringify({ postIds, postData }),
         }).catch(() => {})
-        return { ...l, postIds }
+        return { ...l, postIds, postData }
       })
       return next
     })

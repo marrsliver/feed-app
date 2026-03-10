@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useSavedLists } from '@/hooks/useSavedLists'
+import type { Post } from '@/lib/types'
 
 interface Props {
-  postId: string
+  post: Post
   onClose: () => void
 }
 
-export function ListPickerDropdown({ postId, onClose }: Props) {
+export function ListPickerDropdown({ post, onClose }: Props) {
+  const postId = post.id
   const { lists, createList, togglePostInList, isInList } = useSavedLists()
   const [newName, setNewName] = useState('')
   const [showInput, setShowInput] = useState(false)
@@ -34,7 +36,7 @@ export function ListPickerDropdown({ postId, onClose }: Props) {
     const trimmed = newName.trim()
     if (!trimmed) return
     const id = createList(trimmed)
-    togglePostInList(id, postId)
+    togglePostInList(id, postId, post)
     setNewName('')
     setShowInput(false)
   }
@@ -53,7 +55,7 @@ export function ListPickerDropdown({ postId, onClose }: Props) {
         return (
           <button
             key={list.id}
-            onClick={() => togglePostInList(list.id, postId)}
+            onClick={() => togglePostInList(list.id, postId, post)}
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left"
           >
             <span

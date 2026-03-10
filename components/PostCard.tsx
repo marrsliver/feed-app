@@ -66,7 +66,7 @@ export function PostCard({ post, feedId, onMove, onDelete }: Props) {
               >
                 {post.sourceName}
               </span>
-              <BookmarkButton postId={post.id} />
+              <BookmarkButton post={post} />
             </div>
 
             {/* Title */}

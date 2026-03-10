@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 interface Props {
-  activeFeed: 'research' | 'music' | 'misc'
+  activeFeed: 'research' | 'remix'
   sourcesCount?: number
 }
 
@@ -22,24 +22,14 @@ export function Header({ activeFeed, sourcesCount }: Props) {
             Research Feed
           </Link>
           <Link
-            href="/music"
+            href="/remix"
             className={`px-4 py-2 font-display text-sm font-semibold tracking-tight transition-colors ${
-              activeFeed === 'music'
+              activeFeed === 'remix'
                 ? 'bg-black text-white'
                 : 'bg-white text-black/40 hover:text-black'
             }`}
           >
-            Music Feed
-          </Link>
-          <Link
-            href="/misc"
-            className={`px-4 py-2 font-display text-sm font-semibold tracking-tight transition-colors ${
-              activeFeed === 'misc'
-                ? 'bg-black text-white'
-                : 'bg-white text-black/40 hover:text-black'
-            }`}
-          >
-            Misc
+            Remix
           </Link>
         </div>
 

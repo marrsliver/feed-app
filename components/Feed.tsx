@@ -15,6 +15,8 @@ import { AddLinkPanel } from './AddLinkPanel'
 import { ArchivePanel } from './ArchivePanel'
 import { SourcesSidebar } from './SourcesSidebar'
 import { SourcesCardsView } from './SourcesCardsView'
+import { SourcePanel } from './SourcePanel'
+import { TagSourcesPanel } from './TagSourcesPanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { useLibrarySources } from '@/hooks/useLibrarySources'
 import { useSourceLists } from '@/hooks/useSourceLists'
@@ -75,6 +77,8 @@ export function Feed({ feedId, showSources }: Props) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
+  const [sidebarSelectedSource, setSidebarSelectedSource] = useState<LibrarySource | null>(null)
+  const [sidebarTagPanel, setSidebarTagPanel] = useState<string | null>(null)
 
   const {
     sources: allSources,
@@ -318,6 +322,10 @@ export function Feed({ feedId, showSources }: Props) {
           onAddSource={addSource}
           onRemoveSource={removeSource}
           onToggleFeed={toggleFeed}
+          onOpenSource={(id) => {
+            const source = [...staticSources, ...userSources].find((s) => s.id === id)
+            if (source) { setSidebarSelectedSource(source); setSourcesOpen(false) }
+          }}
           onClose={() => setSourcesOpen(false)}
           onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
         />
@@ -336,6 +344,7 @@ export function Feed({ feedId, showSources }: Props) {
           onToggleSourceInList={toggleSourceInList}
           onCreateSourceList={createSourceList}
           onCreateCategory={createCategory}
+          onShowLibrary={() => { setSourcesCardsOpen(false); setSourcesOpen(true) }}
           onClose={() => setSourcesCardsOpen(false)}
         />
       )}
@@ -357,6 +366,37 @@ export function Feed({ feedId, showSources }: Props) {
       {/* Ask panel */}
       {askOpen && (
         <AskPanel posts={allPosts} onClose={() => setAskOpen(false)} />
+      )}
+
+      {/* SourcePanel opened from sources sidebar */}
+      {sidebarSelectedSource && (
+        <SourcePanel
+          source={sidebarSelectedSource}
+          categories={categories}
+          allTags={allTags}
+          onSetCategory={setCategory}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onPromoteTag={(tag) => { setSidebarSelectedSource(null); /* promotion not supported from sidebar context */ }}
+          onTagClick={(tag) => { setSidebarSelectedSource(null); setSidebarTagPanel(tag) }}
+          onCreateCategory={createCategory}
+          onClose={() => setSidebarSelectedSource(null)}
+        />
+      )}
+
+      {/* TagSourcesPanel opened from sidebar context */}
+      {sidebarTagPanel && (
+        <TagSourcesPanel
+          tag={sidebarTagPanel}
+          sources={allSources}
+          categories={categories}
+          allTags={allTags}
+          onSetCategory={setCategory}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onCreateCategory={createCategory}
+          onClose={() => setSidebarTagPanel(null)}
+        />
       )}
 
       {/* Lists sidebar */}

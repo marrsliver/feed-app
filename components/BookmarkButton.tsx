@@ -4,15 +4,16 @@ import { useState } from 'react'
 import { Bookmark } from 'lucide-react'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { ListPickerDropdown } from './ListPickerDropdown'
+import type { Post } from '@/lib/types'
 
 interface Props {
-  postId: string
+  post: Post
 }
 
-export function BookmarkButton({ postId }: Props) {
+export function BookmarkButton({ post }: Props) {
   const { isInAnyList } = useSavedLists()
   const [open, setOpen] = useState(false)
-  const saved = isInAnyList(postId)
+  const saved = isInAnyList(post.id)
 
   return (
     <div className="relative">
@@ -30,7 +31,7 @@ export function BookmarkButton({ postId }: Props) {
           className={saved ? 'fill-black text-black' : 'text-black/30'}
         />
       </button>
-      {open && <ListPickerDropdown postId={postId} onClose={() => setOpen(false)} />}
+      {open && <ListPickerDropdown post={post} onClose={() => setOpen(false)} />}
     </div>
   )
 }

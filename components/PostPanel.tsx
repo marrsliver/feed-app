@@ -150,7 +150,7 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
             {post.sourceName}
           </span>
           <div className="flex items-center gap-2">
-            <BookmarkButton postId={post.id} />
+            <BookmarkButton post={post} />
             <button
               onClick={onClose}
               className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black"

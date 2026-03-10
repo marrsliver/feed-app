@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, Plus, Trash2, Loader2, Rss, BookOpen } from 'lucide-react'
+import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink } from 'lucide-react'
 import type { LibrarySource, SourceCategory } from '@/lib/types'
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => void
   onRemoveSource: (id: string) => void
   onToggleFeed: (id: string) => void
+  onOpenSource?: (id: string) => void
   onClose: () => void
   onShowCards: () => void
 }
@@ -34,25 +35,37 @@ function SourceRow({
   s,
   onToggleFeed,
   onRemoveSource,
+  onOpenSource,
   showKind,
 }: {
   s: DisplaySource
   onToggleFeed: (id: string) => void
   onRemoveSource: (id: string) => void
+  onOpenSource?: (id: string) => void
   showKind: boolean
 }) {
   return (
     <div className="flex items-center gap-2.5 py-1.5 group">
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
       <div className="flex-1 min-w-0">
-        <a
-          href={s.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-black/70 hover:text-black transition-colors truncate block"
-        >
-          {s.name}
-        </a>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onOpenSource?.(s.id)}
+            className="text-sm text-black/70 hover:text-black transition-colors truncate text-left flex-1"
+          >
+            {s.name}
+          </button>
+          <a
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 p-0.5 text-black/15 hover:text-black/50 transition-colors opacity-0 group-hover:opacity-100"
+            title="Visit source"
+          >
+            <ExternalLink size={10} />
+          </a>
+        </div>
         {showKind && (
           <span className="text-[9px] text-black/25 uppercase tracking-widest">
             {s.kind === 'static' ? 'Built-in' : 'User added'}
@@ -81,7 +94,7 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onClose, onShowCards }: Props) {
+export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onOpenSource, onClose, onShowCards }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
@@ -239,7 +252,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
                     </p>
                     <div className="space-y-0.5">
                       {group.items.map((s) => (
-                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} showKind={false} />
+                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onOpenSource={onOpenSource} showKind={false} />
                       ))}
                     </div>
                   </div>
@@ -253,7 +266,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
                     )}
                     <div className="space-y-0.5">
                       {uncategorized.map((s) => (
-                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} showKind={false} />
+                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onOpenSource={onOpenSource} showKind={false} />
                       ))}
                     </div>
                   </div>
@@ -270,7 +283,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
               ) : (
                 <div className="space-y-0.5">
                   {displayList.map((s) => (
-                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} showKind={tab === 'feed'} />
+                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onOpenSource={onOpenSource} showKind={tab === 'feed'} />
                   ))}
                 </div>
               )

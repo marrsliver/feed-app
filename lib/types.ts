@@ -69,5 +69,6 @@ export interface SavedList {
   id: string
   name: string
   postIds: string[]
+  postData: Record<string, Post>
   createdAt: number
 }

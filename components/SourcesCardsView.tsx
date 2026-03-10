@@ -7,6 +7,7 @@ import type { LibrarySource, SourceCategory, SourceList } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { SourcePanel } from './SourcePanel'
 import { TagPromotionModal } from './TagPromotionModal'
+import { TagSourcesPanel } from './TagSourcesPanel'
 
 interface Props {
   sources: LibrarySource[]
@@ -19,6 +20,7 @@ interface Props {
   onToggleSourceInList: (listId: string, sourceId: string) => void
   onCreateSourceList: (name: string) => string
   onCreateCategory: (name: string) => string
+  onShowLibrary: () => void
   onClose: () => void
 }
 
@@ -43,10 +45,12 @@ export function SourcesCardsView({
   onToggleSourceInList,
   onCreateSourceList,
   onCreateCategory,
+  onShowLibrary,
   onClose,
 }: Props) {
   const [selected, setSelected] = useState<LibrarySource | null>(null)
   const [promotingTag, setPromotingTag] = useState<string | null>(null)
+  const [tagPanel, setTagPanel] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState<string | null>(null)
   const [filterTag, setFilterTag] = useState<string | null>(null)
   const [filterList, setFilterList] = useState<string | null>(null)
@@ -102,6 +106,13 @@ export function SourcesCardsView({
       <div className="px-6 py-3 border-b border-black/10 flex items-center gap-3 flex-wrap shrink-0">
         {/* Category pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={onShowLibrary}
+            className="text-[9px] font-semibold uppercase tracking-[0.12em] px-2 py-1 border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
+          >
+            Library
+          </button>
+          <div className="w-px h-3.5 bg-black/10 mx-0.5" />
           <button
             onClick={() => setFilterCategory(null)}
             className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-2 py-1 border transition-colors ${
@@ -279,7 +290,13 @@ export function SourcesCardsView({
                             key={tag}
                             className="inline-flex items-center gap-0.5 text-[9px] text-black/40 border border-black/10 px-1.5 py-0.5"
                           >
-                            {tag}
+                            <button
+                              onClick={() => setTagPanel(tag)}
+                              className="hover:text-black transition-colors leading-none"
+                              title={`See all sources tagged "${tag}"`}
+                            >
+                              {tag}
+                            </button>
                             <button
                               onClick={() => onRemoveTag(s.id, tag)}
                               className="text-black/25 hover:text-black/60 transition-colors leading-none ml-0.5"
@@ -335,6 +352,7 @@ export function SourcesCardsView({
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
           onPromoteTag={(tag) => { setSelected(null); setPromotingTag(tag) }}
+          onTagClick={(tag) => { setSelected(null); setTagPanel(tag) }}
           onCreateCategory={onCreateCategory}
           onClose={() => setSelected(null)}
         />
@@ -348,9 +366,22 @@ export function SourcesCardsView({
           onConfirm={handlePromoteTag}
           onClose={() => setPromotingTag(null)}
           onCreateCategory={(name) => {
-            // Return a slugified id
             return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
           }}
+        />
+      )}
+
+      {tagPanel && (
+        <TagSourcesPanel
+          tag={tagPanel}
+          sources={sources}
+          categories={categories}
+          allTags={allTags}
+          onSetCategory={onSetCategory}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
+          onCreateCategory={onCreateCategory}
+          onClose={() => setTagPanel(null)}
         />
       )}
     </div>

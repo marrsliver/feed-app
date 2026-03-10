@@ -84,12 +84,13 @@ interface Props {
   onSetCategory: (id: string, categoryId: string | null) => void
   onAddTag: (id: string, tag: string) => void
   onRemoveTag: (id: string, tag: string) => void
-  onPromoteTag: (tag: string) => void
+  onPromoteTag?: (tag: string) => void
+  onTagClick?: (tag: string) => void
   onCreateCategory: (name: string) => string
   onClose: () => void
 }
 
-export function SourcePanel({ source, categories, allTags, onSetCategory, onAddTag, onRemoveTag, onPromoteTag, onCreateCategory, onClose }: Props) {
+export function SourcePanel({ source, categories, allTags, onSetCategory, onAddTag, onRemoveTag, onPromoteTag, onTagClick, onCreateCategory, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
@@ -133,7 +134,7 @@ export function SourcePanel({ source, categories, allTags, onSetCategory, onAddT
 
   const filteredSuggestions = tagInput.trim()
     ? allTags.filter((t) => t.includes(tagInput.toLowerCase()) && !source.tags.includes(t))
-    : []
+    : allTags.filter((t) => !source.tags.includes(t))
 
   return (
     <>
@@ -229,7 +230,13 @@ export function SourcePanel({ source, categories, allTags, onSetCategory, onAddT
                       key={tag}
                       className="inline-flex items-center gap-0.5 text-[9px] text-black/50 border border-black/15 px-1.5 py-0.5"
                     >
-                      {tag}
+                      <button
+                        onClick={() => onTagClick?.(tag)}
+                        className={`leading-none ${onTagClick ? 'hover:text-black transition-colors' : ''}`}
+                        title={onTagClick ? `See all sources tagged "${tag}"` : undefined}
+                      >
+                        {tag}
+                      </button>
                       <button
                         onClick={() => onRemoveTag(source.id, tag)}
                         className="text-black/25 hover:text-black/60 transition-colors leading-none ml-0.5"
@@ -237,14 +244,16 @@ export function SourcePanel({ source, categories, allTags, onSetCategory, onAddT
                       >
                         ×
                       </button>
-                      <button
-                        onClick={() => onPromoteTag(tag)}
-                        title="Promote to category"
-                        className="text-black/20 hover:text-black/50 transition-colors leading-none ml-0.5"
-                        aria-label={`Promote ${tag} to category`}
-                      >
-                        ↑
-                      </button>
+                      {onPromoteTag && (
+                        <button
+                          onClick={() => onPromoteTag(tag)}
+                          title="Promote to category"
+                          className="text-black/20 hover:text-black/50 transition-colors leading-none ml-0.5"
+                          aria-label={`Promote ${tag} to category`}
+                        >
+                          ↑
+                        </button>
+                      )}
                     </span>
                   ))}
                 </div>
