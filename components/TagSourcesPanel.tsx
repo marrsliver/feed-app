@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { LibrarySource, SourceCategory } from '@/lib/types'
 import { SourcePanel } from './SourcePanel'
@@ -29,6 +29,17 @@ export function TagSourcesPanel({
   onClose,
 }: Props) {
   const [selectedSource, setSelectedSource] = useState<LibrarySource | null>(null)
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (selectedSource) setSelectedSource(null)
+        else onClose()
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [selectedSource, onClose])
 
   const taggedSources = sources
     .filter((s) => s.tags.includes(tag))

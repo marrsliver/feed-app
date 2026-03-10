@@ -270,7 +270,7 @@ export function Feed({ feedId, showSources }: Props) {
               className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
             >
               <Archive size={13} />
-              {deletedPosts.length}
+              Archive ({deletedPosts.length})
             </button>
           )}
 
@@ -420,7 +420,7 @@ export function Feed({ feedId, showSources }: Props) {
       {/* Status */}
       {status === 'pending' && feedStaticSources.length > 0 && (
         <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-indigo-500" size={32} />
+          <Loader2 className="animate-spin text-black/20" size={32} />
         </div>
       )}
 
@@ -468,13 +468,13 @@ export function Feed({ feedId, showSources }: Props) {
       {/* Loading more indicator */}
       {isFetchingNextPage && (
         <div className="flex justify-center py-6">
-          <Loader2 className="animate-spin text-indigo-400" size={24} />
+          <Loader2 className="animate-spin text-black/20" size={24} />
         </div>
       )}
 
       {/* End of feed */}
       {status === 'success' && !hasNextPage && displayPosts.length > 0 && (
-        <p className="text-center text-xs text-gray-400 py-4">You&apos;ve reached the end.</p>
+        <p className="text-center text-xs text-black/25 py-4">You&apos;ve reached the end.</p>
       )}
     </div>
   )

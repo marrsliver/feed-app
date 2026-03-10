@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { X, ArrowUpRight, Trash2, Pencil, Check, ArrowLeftRight } from 'lucide-react'
+import { X, ArrowUpRight, Trash2, Pencil, Check, ArrowLeftRight, Link2 } from 'lucide-react'
 import type { Post } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { BookmarkButton } from './BookmarkButton'
@@ -114,7 +114,15 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
   const comments = getComments(post.id)
   const [draft, setDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [copied, setCopied] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  function copyUrl() {
+    navigator.clipboard.writeText(post.url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
 
   // Close on Escape
   useEffect(() => {
@@ -135,12 +143,12 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+        className="fixed inset-0 z-[80] bg-black/20 backdrop-blur-[1px]"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md z-50 bg-white flex flex-col overflow-hidden">
+      <div className="fixed top-0 right-0 h-full w-full max-w-md z-[90] bg-white flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
           <span
@@ -205,6 +213,13 @@ export function PostPanel({ post, feedId, onMove, onDelete, onClose }: Props) {
                 Open article
                 <ArrowUpRight size={13} />
               </a>
+              <button
+                onClick={copyUrl}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-black/20 text-xs font-medium text-black/50 hover:border-black/50 hover:text-black transition-colors"
+              >
+                <Link2 size={13} />
+                {copied ? 'Copied!' : 'Copy URL'}
+              </button>
               {isManual && feedId && (
                 <button
                   onClick={() => { onMove?.(); onClose() }}

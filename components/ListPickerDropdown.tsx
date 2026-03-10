@@ -45,10 +45,10 @@ export function ListPickerDropdown({ post, onClose }: Props) {
     <div
       ref={containerRef}
       onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-      className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-white rounded-lg shadow-lg border border-gray-200 py-1 text-sm"
+      className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-white shadow-lg border border-black/15 py-1 text-sm"
     >
       {lists.length === 0 && !showInput && (
-        <p className="px-3 py-2 text-gray-400 text-xs">No lists yet</p>
+        <p className="px-3 py-2 text-black/25 text-xs">No lists yet</p>
       )}
       {lists.map((list) => {
         const checked = isInList(list.id, postId)
@@ -56,20 +56,20 @@ export function ListPickerDropdown({ post, onClose }: Props) {
           <button
             key={list.id}
             onClick={() => togglePostInList(list.id, postId, post)}
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/5 text-left"
           >
             <span
-              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                checked ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'
+              className={`w-4 h-4 border flex items-center justify-center shrink-0 ${
+                checked ? 'bg-black border-black' : 'border-black/25'
               }`}
             >
               {checked && <Check size={10} className="text-white" strokeWidth={3} />}
             </span>
-            <span className="truncate text-gray-700">{list.name}</span>
+            <span className="truncate text-black/70">{list.name}</span>
           </button>
         )
       })}
-      <div className="border-t border-gray-100 mt-1 pt-1">
+      <div className="border-t border-black/8 mt-1 pt-1">
         {showInput ? (
           <div className="px-3 py-1.5 flex gap-1">
             <input
@@ -81,11 +81,11 @@ export function ListPickerDropdown({ post, onClose }: Props) {
                 if (e.key === 'Escape') { setShowInput(false); setNewName('') }
               }}
               placeholder="List name…"
-              className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-indigo-400"
+              className="flex-1 text-xs border border-black/15 px-2 py-1 outline-none focus:border-black/40 transition-colors"
             />
             <button
               onClick={handleCreate}
-              className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700"
+              className="text-xs bg-black text-white px-2 py-1 hover:bg-black/80 transition-colors"
             >
               Add
             </button>
@@ -93,7 +93,7 @@ export function ListPickerDropdown({ post, onClose }: Props) {
         ) : (
           <button
             onClick={() => setShowInput(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-indigo-600"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/5 text-black/40 hover:text-black transition-colors"
           >
             <Plus size={14} />
             <span>New list</span>

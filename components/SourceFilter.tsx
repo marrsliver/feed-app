@@ -12,7 +12,8 @@ export function SourceFilter({ sources, active, onToggle }: Props) {
   if (sources.length === 0) return null
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+    <div className="relative">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
       {sources.map((source) => {
         const isActive = active.has(source.id)
         return (
@@ -30,6 +31,9 @@ export function SourceFilter({ sources, active, onToggle }: Props) {
           </button>
         )
       })}
+      </div>
+      {/* Right fade — hints at overflow */}
+      <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white to-transparent" />
     </div>
   )
 }

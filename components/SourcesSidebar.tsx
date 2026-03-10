@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink } from 'lucide-react'
 import type { LibrarySource, SourceCategory } from '@/lib/types'
 
@@ -105,6 +105,15 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 50)
   }, [])
+
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose()
+  }, [onClose])
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [handleEscape])
 
   async function handleDetect() {
     const url = inputUrl.trim()

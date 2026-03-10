@@ -70,7 +70,7 @@ export function PostCard({ post, feedId, onMove, onDelete }: Props) {
             </div>
 
             {/* Title */}
-            <h2 className="font-display text-sm font-semibold text-black leading-snug line-clamp-3 group-hover:opacity-60 transition-opacity duration-200">
+            <h2 className="font-display text-sm font-semibold text-black leading-snug line-clamp-3">
               {post.title}
             </h2>
 
