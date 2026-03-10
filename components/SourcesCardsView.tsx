@@ -348,9 +348,12 @@ export function SourcesCardsView({
           source={selected}
           categories={categories}
           allTags={allTags}
+          sourceLists={sourceLists}
           onSetCategory={onSetCategory}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
+          onToggleSourceInList={onToggleSourceInList}
+          onCreateSourceList={onCreateSourceList}
           onPromoteTag={(tag) => { setSelected(null); setPromotingTag(tag) }}
           onTagClick={(tag) => { setSelected(null); setTagPanel(tag) }}
           onCreateCategory={onCreateCategory}

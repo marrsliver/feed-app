@@ -5,13 +5,16 @@ import type { SavedList, Post } from '@/lib/types'
 
 export function useSavedLists() {
   const [lists, setLists] = useState<SavedList[]>([])
+  const [loaded, setLoaded] = useState(false)
 
-  useEffect(() => {
+  const refetch = useCallback(() => {
     fetch('/api/db/lists')
       .then((r) => r.json())
-      .then((data: SavedList[]) => setLists(data))
-      .catch(() => {})
+      .then((data: SavedList[]) => { setLists(data); setLoaded(true) })
+      .catch(() => setLoaded(true))
   }, [])
+
+  useEffect(() => { refetch() }, [refetch])
 
   const createList = useCallback((name: string): string => {
     const id = Date.now().toString()
@@ -72,5 +75,5 @@ export function useSavedLists() {
     [lists]
   )
 
-  return { lists, createList, deleteList, renameList, togglePostInList, isInList, isInAnyList }
+  return { lists, loaded, refetch, createList, deleteList, renameList, togglePostInList, isInList, isInAnyList }
 }

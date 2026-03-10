@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, ArrowUpRight, Pencil, Check, Trash2, Plus } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
-import type { LibrarySource, SourceCategory } from '@/lib/types'
+import type { LibrarySource, SourceCategory, SourceList } from '@/lib/types'
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -81,16 +81,19 @@ interface Props {
   source: LibrarySource
   categories: SourceCategory[]
   allTags: string[]
+  sourceLists?: SourceList[]
   onSetCategory: (id: string, categoryId: string | null) => void
   onAddTag: (id: string, tag: string) => void
   onRemoveTag: (id: string, tag: string) => void
+  onToggleSourceInList?: (listId: string, sourceId: string) => void
+  onCreateSourceList?: (name: string) => string
   onPromoteTag?: (tag: string) => void
   onTagClick?: (tag: string) => void
   onCreateCategory: (name: string) => string
   onClose: () => void
 }
 
-export function SourcePanel({ source, categories, allTags, onSetCategory, onAddTag, onRemoveTag, onPromoteTag, onTagClick, onCreateCategory, onClose }: Props) {
+export function SourcePanel({ source, categories, allTags, sourceLists, onSetCategory, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
@@ -98,6 +101,8 @@ export function SourcePanel({ source, categories, allTags, onSetCategory, onAddT
   const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [newListName, setNewListName] = useState('')
+  const [addingList, setAddingList] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
 
@@ -292,6 +297,90 @@ export function SourcePanel({ source, categories, allTags, onSetCategory, onAddT
                 )}
               </div>
             </div>
+
+            {/* Source Lists */}
+            {sourceLists && (
+              <div className="space-y-2">
+                <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
+                  Lists
+                </label>
+                {/* Current memberships */}
+                {sourceLists.filter(l => l.sourceIds.includes(source.id)).length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {sourceLists
+                      .filter(l => l.sourceIds.includes(source.id))
+                      .map(list => (
+                        <span key={list.id} className="inline-flex items-center gap-0.5 text-[9px] text-black/50 border border-black/15 px-1.5 py-0.5">
+                          {list.name}
+                          <button
+                            onClick={() => onToggleSourceInList?.(list.id, source.id)}
+                            className="text-black/25 hover:text-black/60 transition-colors leading-none ml-0.5"
+                            aria-label={`Remove from ${list.name}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    }
+                  </div>
+                )}
+                {/* Add to list */}
+                {addingList ? (
+                  <div className="space-y-1.5">
+                    {/* Existing lists not yet added */}
+                    {sourceLists.filter(l => !l.sourceIds.includes(source.id)).length > 0 && (
+                      <div className="flex flex-col gap-0.5 border border-black/10 max-h-32 overflow-y-auto">
+                        {sourceLists
+                          .filter(l => !l.sourceIds.includes(source.id))
+                          .map(list => (
+                            <button
+                              key={list.id}
+                              onMouseDown={(e) => { e.preventDefault(); onToggleSourceInList?.(list.id, source.id); setAddingList(false) }}
+                              className="text-left px-2.5 py-1.5 text-xs text-black/70 hover:bg-black/5 transition-colors"
+                            >
+                              {list.name}
+                            </button>
+                          ))
+                        }
+                      </div>
+                    )}
+                    {/* New list input */}
+                    <div className="flex gap-1.5">
+                      <input
+                        value={newListName}
+                        onChange={(e) => setNewListName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newListName.trim()) {
+                            const id = onCreateSourceList?.(newListName.trim())
+                            if (id) onToggleSourceInList?.(id, source.id)
+                            setNewListName('')
+                            setAddingList(false)
+                          }
+                          if (e.key === 'Escape') { setAddingList(false); setNewListName('') }
+                        }}
+                        autoFocus
+                        placeholder="New list name…"
+                        className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                      />
+                      <button
+                        onClick={() => { setAddingList(false); setNewListName('') }}
+                        className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAddingList(true)}
+                    className="text-[10px] text-black/30 hover:text-black transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={10} />
+                    Add to list
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Status pills */}
             <div className="flex items-center gap-1.5 flex-wrap">

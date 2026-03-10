@@ -324,10 +324,12 @@ export function Feed({ feedId, showSources }: Props) {
           onToggleFeed={toggleFeed}
           onOpenSource={(id) => {
             const source = [...staticSources, ...userSources].find((s) => s.id === id)
-            if (source) { setSidebarSelectedSource(source); setSourcesOpen(false) }
+            if (source) setSidebarSelectedSource(source)
+            // Don't close sidebar - keep it open
           }}
           onClose={() => setSourcesOpen(false)}
           onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
+          elevated={sourcesCardsOpen}
         />
       )}
 
@@ -344,7 +346,7 @@ export function Feed({ feedId, showSources }: Props) {
           onToggleSourceInList={toggleSourceInList}
           onCreateSourceList={createSourceList}
           onCreateCategory={createCategory}
-          onShowLibrary={() => { setSourcesCardsOpen(false); setSourcesOpen(true) }}
+          onShowLibrary={() => { setSourcesOpen(true) }}
           onClose={() => setSourcesCardsOpen(false)}
         />
       )}
@@ -374,9 +376,12 @@ export function Feed({ feedId, showSources }: Props) {
           source={sidebarSelectedSource}
           categories={categories}
           allTags={allTags}
+          sourceLists={sourceLists}
           onSetCategory={setCategory}
           onAddTag={addTag}
           onRemoveTag={removeTag}
+          onToggleSourceInList={toggleSourceInList}
+          onCreateSourceList={createSourceList}
           onPromoteTag={(tag) => { setSidebarSelectedSource(null); /* promotion not supported from sidebar context */ }}
           onTagClick={(tag) => { setSidebarSelectedSource(null); setSidebarTagPanel(tag) }}
           onCreateCategory={createCategory}

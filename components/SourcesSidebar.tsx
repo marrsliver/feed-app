@@ -15,6 +15,7 @@ interface Props {
   onOpenSource?: (id: string) => void
   onClose: () => void
   onShowCards: () => void
+  elevated?: boolean
 }
 
 type DetectState =
@@ -94,7 +95,7 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onOpenSource, onClose, onShowCards }: Props) {
+export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
@@ -197,16 +198,16 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
   const TABS: { id: TabView; label: string }[] = [
     { id: 'library', label: 'Library' },
     { id: 'feed', label: 'In Feed' },
-    { id: 'list', label: 'List Only' },
+    { id: 'list', label: 'Library Only' },
   ]
 
   const isLoading = detect.status === 'loading' || detect.status === 'categorizing'
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={onClose} />
+      <div className={`fixed inset-0 bg-black/20 backdrop-blur-[1px] ${elevated ? 'z-[51]' : 'z-40'}`} onClick={onClose} />
 
-      <div className="fixed top-0 left-0 h-full w-80 z-50 bg-white shadow-xl flex flex-col">
+      <div className={`fixed top-0 left-0 h-full w-80 bg-white shadow-xl flex flex-col ${elevated ? 'z-[55]' : 'z-50'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
           <h2 className="text-sm font-semibold text-black">Sources</h2>
@@ -278,7 +279,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
               const displayList = tab === 'feed' ? feedList : listOnlyList
               return displayList.length === 0 ? (
                 <p className="text-center py-10 text-black/25 text-xs">
-                  {tab === 'feed' ? 'No sources in feed yet.' : 'No list-only sources yet.'}
+                  {tab === 'feed' ? 'No sources in feed yet.' : 'No library-only sources yet.'}
                 </p>
               ) : (
                 <div className="space-y-0.5">
