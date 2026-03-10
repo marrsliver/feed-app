@@ -57,6 +57,7 @@ function ListCard({ list, onClick }: { list: SavedList; onClick: () => void }) {
 function ListDetailPanel({ list, onClose }: { list: SavedList; onClose: () => void }) {
   const posts: Post[] = Object.values(list.postData ?? {})
   posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const missingData = list.postIds.length > 0 && posts.length === 0
 
   return (
     <>
@@ -74,9 +75,21 @@ function ListDetailPanel({ list, onClose }: { list: SavedList; onClose: () => vo
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {posts.length === 0 ? (
-            <div className="text-center py-20 text-black/25 text-sm">
-              <p>No posts saved to this list yet.</p>
-              <p className="text-[10px] mt-2">Bookmark posts from the Research feed to add them here.</p>
+            <div className="text-center py-20 text-black/25 text-sm space-y-2">
+              {missingData ? (
+                <>
+                  <p>{list.postIds.length} post{list.postIds.length !== 1 ? 's' : ''} saved to this list.</p>
+                  <p className="text-[10px] max-w-sm mx-auto leading-relaxed">
+                    These were bookmarked before a recent update and their content isn&apos;t stored yet.
+                    Find them on the Research feed and re-save to this list to see them here.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>No posts saved to this list yet.</p>
+                  <p className="text-[10px]">Bookmark posts from the Research feed to add them here.</p>
+                </>
+              )}
             </div>
           ) : (
             <Masonry

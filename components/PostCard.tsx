@@ -9,6 +9,8 @@ import { PostPanel } from './PostPanel'
 interface Props {
   post: Post
   feedId?: string
+  isRead?: boolean
+  onRead?: () => void
   onMove?: () => void
   onDelete?: () => void
 }
@@ -25,14 +27,14 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post, feedId, onMove, onDelete }: Props) {
+export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
     <>
       <div className="break-inside-avoid mb-4">
         <div
-          onClick={() => setPanelOpen(true)}
+          onClick={() => { onRead?.(); setPanelOpen(true) }}
           className="group block bg-white overflow-hidden transition-all duration-300 cursor-pointer"
           style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
           onMouseEnter={(e) => {
@@ -70,13 +72,13 @@ export function PostCard({ post, feedId, onMove, onDelete }: Props) {
             </div>
 
             {/* Title */}
-            <h2 className="font-display text-sm font-semibold text-black leading-snug line-clamp-3">
+            <h2 className={`font-display text-sm font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? 'text-black/35' : 'text-black'}`}>
               {post.title}
             </h2>
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className="text-xs text-black/40 leading-relaxed line-clamp-3">
+              <p className={`text-xs leading-relaxed line-clamp-3 ${isRead ? 'text-black/20' : 'text-black/40'}`}>
                 {post.excerpt}
               </p>
             )}

@@ -24,6 +24,7 @@ import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useManualPosts } from '@/hooks/useManualPosts'
 import { useDeletedPosts } from '@/hooks/useDeletedPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
+import { useReadPosts } from '@/hooks/useReadPosts'
 
 interface Props {
   feedId: string
@@ -79,6 +80,8 @@ export function Feed({ feedId, showSources }: Props) {
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
   const [sidebarSelectedSource, setSidebarSelectedSource] = useState<LibrarySource | null>(null)
   const [sidebarTagPanel, setSidebarTagPanel] = useState<string | null>(null)
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false)
+  const { isRead, markRead } = useReadPosts()
 
   const {
     sources: allSources,
@@ -212,12 +215,16 @@ export function Feed({ feedId, showSources }: Props) {
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
   const allPosts = rankPosts(filtered)
   const activeList = lists.find((l) => l.id === view)
-  const displayPosts =
+  const listFiltered =
     view === 'all'
       ? allPosts
       : allPosts.filter((p) => activeList?.postIds.includes(p.id))
+  const displayPosts = showUnreadOnly
+    ? listFiltered.filter((p) => !isRead(p.id))
+    : listFiltered
 
   const isFiltering = view !== 'all'
+  const unreadCount = allPosts.filter((p) => !isRead(p.id)).length
 
   // Sources for the filter bar (static + user in-feed for this feedId)
   const filterSources = useMemo(() => [
@@ -274,6 +281,20 @@ export function Feed({ feedId, showSources }: Props) {
             </button>
           )}
 
+          {/* Unread filter toggle */}
+          <button
+            onClick={() => setShowUnreadOnly((v) => !v)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
+              showUnreadOnly
+                ? 'bg-black text-white border-black'
+                : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
+            }`}
+          >
+            Unread{!showUnreadOnly && unreadCount > 0 && (
+              <span className="text-[9px] font-semibold">{unreadCount}</span>
+            )}
+          </button>
+
           {/* Lists button / active filter chip */}
           {isFiltering ? (
             <div className="shrink-0 flex items-center border border-black bg-black text-white text-xs font-medium overflow-hidden">
@@ -308,6 +329,7 @@ export function Feed({ feedId, showSources }: Props) {
             sources={filterSources}
             active={activeSources}
             onToggle={toggleSource}
+            onReset={() => setActiveSources(new Set(allSourceIds))}
           />
         </div>
       </div>
@@ -452,6 +474,8 @@ export function Feed({ feedId, showSources }: Props) {
               key={post.id}
               post={post}
               feedId={feedId}
+              isRead={isRead(post.id)}
+              onRead={() => markRead(post.id)}
               onMove={post.sourceId === 'manual' ? () => movePost(post.id, otherFeedId) : undefined}
               onDelete={() => {
                 archivePost(post, feedId, post.sourceId === 'manual')
