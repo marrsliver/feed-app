@@ -91,7 +91,7 @@ export function Feed({ feedId, showSources }: Props) {
   } = useLibrarySources()
 
   const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
-  const { categories } = useSourceCategories()
+  const { categories, createCategory } = useSourceCategories()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
@@ -335,6 +335,7 @@ export function Feed({ feedId, showSources }: Props) {
           onRemoveTag={removeTag}
           onToggleSourceInList={toggleSourceInList}
           onCreateSourceList={createSourceList}
+          onCreateCategory={createCategory}
           onClose={() => setSourcesCardsOpen(false)}
         />
       )}

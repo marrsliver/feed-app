@@ -18,6 +18,7 @@ interface Props {
   onRemoveTag: (id: string, tag: string) => void
   onToggleSourceInList: (listId: string, sourceId: string) => void
   onCreateSourceList: (name: string) => string
+  onCreateCategory: (name: string) => string
   onClose: () => void
 }
 
@@ -41,6 +42,7 @@ export function SourcesCardsView({
   onRemoveTag,
   onToggleSourceInList,
   onCreateSourceList,
+  onCreateCategory,
   onClose,
 }: Props) {
   const [selected, setSelected] = useState<LibrarySource | null>(null)
@@ -333,6 +335,7 @@ export function SourcesCardsView({
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
           onPromoteTag={(tag) => { setSelected(null); setPromotingTag(tag) }}
+          onCreateCategory={onCreateCategory}
           onClose={() => setSelected(null)}
         />
       )}

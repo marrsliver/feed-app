@@ -30,6 +30,57 @@ type DisplaySource =
   | { kind: 'static'; id: string; name: string; url: string; color: string }
   | { kind: 'user'; id: string; name: string; url: string; color: string; inFeed: boolean }
 
+function SourceRow({
+  s,
+  onToggleFeed,
+  onRemoveSource,
+  showKind,
+}: {
+  s: DisplaySource
+  onToggleFeed: (id: string) => void
+  onRemoveSource: (id: string) => void
+  showKind: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2.5 py-1.5 group">
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+      <div className="flex-1 min-w-0">
+        <a
+          href={s.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-black/70 hover:text-black transition-colors truncate block"
+        >
+          {s.name}
+        </a>
+        {showKind && (
+          <span className="text-[9px] text-black/25 uppercase tracking-widest">
+            {s.kind === 'static' ? 'Built-in' : 'User added'}
+          </span>
+        )}
+      </div>
+      {s.kind === 'user' && (
+        <>
+          <button
+            onClick={() => onToggleFeed(s.id)}
+            title={s.inFeed ? 'In feed — click to move to list only' : 'List only — click to add to feed'}
+            className={`shrink-0 p-1 transition-colors ${s.inFeed ? 'text-black/40 hover:text-black' : 'text-black/15 hover:text-black/40'}`}
+          >
+            {s.inFeed ? <Rss size={11} /> : <BookOpen size={11} />}
+          </button>
+          <button
+            onClick={() => onRemoveSource(s.id)}
+            className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-red-500 transition-all"
+            aria-label="Remove source"
+          >
+            <Trash2 size={11} />
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onClose, onShowCards }: Props) {
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
@@ -102,11 +153,33 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
 
   const byName = (a: DisplaySource, b: DisplaySource) => a.name.localeCompare(b.name)
 
-  const libraryList = [...allStatic, ...allUser].sort(byName)
   const feedList = [...allStatic, ...allUser.filter((s) => s.kind === 'user' && (s as { inFeed: boolean }).inFeed)].sort(byName)
   const listOnlyList = allUser.filter((s) => s.kind === 'user' && !(s as { inFeed: boolean }).inFeed).sort(byName)
 
-  const displayList = tab === 'library' ? libraryList : tab === 'feed' ? feedList : listOnlyList
+  // Build grouped hierarchy for library tab
+  const allLibrary = [...allStatic, ...allUser].sort(byName)
+  const allLibrarySources = [...staticSources, ...userSources]
+  type GroupedCategory = { categoryId: string; categoryName: string; items: DisplaySource[] }
+  const grouped: GroupedCategory[] = []
+  const uncategorized: DisplaySource[] = []
+
+  for (const s of allLibrary) {
+    const src = allLibrarySources.find((r) => r.id === s.id)
+    const catId = src?.categoryId
+    if (catId) {
+      const cat = categories.find((c) => c.id === catId)
+      const catName = cat?.name ?? catId
+      let group = grouped.find((g) => g.categoryId === catId)
+      if (!group) {
+        group = { categoryId: catId, categoryName: catName, items: [] }
+        grouped.push(group)
+      }
+      group.items.push(s)
+    } else {
+      uncategorized.push(s)
+    }
+  }
+  grouped.sort((a, b) => a.categoryName.localeCompare(b.categoryName))
 
   const TABS: { id: TabView; label: string }[] = [
     { id: 'library', label: 'Library' },
@@ -154,54 +227,54 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
 
         {/* Source list */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {displayList.length === 0 ? (
-            <p className="text-center py-10 text-black/25 text-xs">
-              {tab === 'feed' ? 'No sources in feed yet.' : 'No list-only sources yet.'}
-            </p>
-          ) : (
-            <div className="space-y-0.5">
-              {displayList.map((s) => (
-                <div key={s.id} className="flex items-center gap-2.5 py-1.5 group">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-
-                  <div className="flex-1 min-w-0">
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-black/70 hover:text-black transition-colors truncate block"
-                    >
-                      {s.name}
-                    </a>
-                    {tab === 'feed' && (
-                      <span className="text-[9px] text-black/25 uppercase tracking-widest">
-                        {s.kind === 'static' ? 'Built-in' : 'User added'}
-                      </span>
-                    )}
+          {tab === 'library' ? (
+            allLibrary.length === 0 ? (
+              <p className="text-center py-10 text-black/25 text-xs">No sources yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {grouped.map((group) => (
+                  <div key={group.categoryId}>
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8">
+                      {group.categoryName}
+                    </p>
+                    <div className="space-y-0.5">
+                      {group.items.map((s) => (
+                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} showKind={false} />
+                      ))}
+                    </div>
                   </div>
-
-                  {/* Controls — user sources only */}
-                  {s.kind === 'user' && (
-                    <>
-                      <button
-                        onClick={() => onToggleFeed(s.id)}
-                        title={(s as { inFeed: boolean }).inFeed ? 'In feed — click to move to list only' : 'List only — click to add to feed'}
-                        className={`shrink-0 p-1 transition-colors ${(s as { inFeed: boolean }).inFeed ? 'text-black/40 hover:text-black' : 'text-black/15 hover:text-black/40'}`}
-                      >
-                        {(s as { inFeed: boolean }).inFeed ? <Rss size={11} /> : <BookOpen size={11} />}
-                      </button>
-                      <button
-                        onClick={() => onRemoveSource(s.id)}
-                        className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-red-500 transition-all"
-                        aria-label="Remove source"
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </>
-                  )}
+                ))}
+                {uncategorized.length > 0 && (
+                  <div>
+                    {grouped.length > 0 && (
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/20 mb-1 pb-1 border-b border-black/8">
+                        Uncategorized
+                      </p>
+                    )}
+                    <div className="space-y-0.5">
+                      {uncategorized.map((s) => (
+                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} showKind={false} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          ) : (
+            (() => {
+              const displayList = tab === 'feed' ? feedList : listOnlyList
+              return displayList.length === 0 ? (
+                <p className="text-center py-10 text-black/25 text-xs">
+                  {tab === 'feed' ? 'No sources in feed yet.' : 'No list-only sources yet.'}
+                </p>
+              ) : (
+                <div className="space-y-0.5">
+                  {displayList.map((s) => (
+                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} showKind={tab === 'feed'} />
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })()
           )}
         </div>
 

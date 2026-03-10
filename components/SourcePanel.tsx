@@ -85,16 +85,29 @@ interface Props {
   onAddTag: (id: string, tag: string) => void
   onRemoveTag: (id: string, tag: string) => void
   onPromoteTag: (tag: string) => void
+  onCreateCategory: (name: string) => string
   onClose: () => void
 }
 
-export function SourcePanel({ source, categories, allTags, onSetCategory, onAddTag, onRemoveTag, onPromoteTag, onClose }: Props) {
+export function SourcePanel({ source, categories, allTags, onSetCategory, onAddTag, onRemoveTag, onPromoteTag, onCreateCategory, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false)
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const newCategoryRef = useRef<HTMLInputElement>(null)
+
+  function handleCreateCategory() {
+    const name = newCategoryName.trim()
+    if (!name) return
+    const id = onCreateCategory(name)
+    onSetCategory(source.id, id)
+    setAddingCategory(false)
+    setNewCategoryName('')
+  }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -153,16 +166,55 @@ export function SourcePanel({ source, categories, allTags, onSetCategory, onAddT
               <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
                 Category
               </label>
-              <select
-                value={source.categoryId ?? ''}
-                onChange={(e) => onSetCategory(source.id, e.target.value || null)}
-                className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
-              >
-                <option value="">— None —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              {addingCategory ? (
+                <div className="flex gap-1.5">
+                  <input
+                    ref={newCategoryRef}
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateCategory()
+                      if (e.key === 'Escape') { setAddingCategory(false); setNewCategoryName('') }
+                    }}
+                    autoFocus
+                    placeholder="New category name…"
+                    className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                  />
+                  <button
+                    onClick={handleCreateCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="px-2 py-1.5 text-xs bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30"
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => { setAddingCategory(false); setNewCategoryName('') }}
+                    className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-1.5">
+                  <select
+                    value={source.categoryId ?? ''}
+                    onChange={(e) => onSetCategory(source.id, e.target.value || null)}
+                    className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+                  >
+                    <option value="">— None —</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setAddingCategory(true)}
+                    className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
+                    title="Add new category"
+                  >
+                    <Plus size={11} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Tags */}
