@@ -8,7 +8,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.name !== undefined) update.name = body.name
   if (body.postIds !== undefined) update.post_ids = body.postIds
   if (body.postData !== undefined) update.post_data = body.postData
-  if (body.postData !== undefined) update.post_data = body.postData
   const { error } = await getSupabase().from('saved_lists').update(update).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

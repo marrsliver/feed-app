@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Masonry from 'react-masonry-css'
-import { X, Layers, Loader2, LinkIcon, BookmarkIcon, BookmarkCheck, Search } from 'lucide-react'
+import { X, Layers, Loader2, LinkIcon, BookmarkIcon, Search } from 'lucide-react'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { ListsSidebar } from '@/components/ListsSidebar'
@@ -98,13 +98,12 @@ function ListDetailPanel({ list, onClose }: { list: SavedList; onClose: () => vo
 export default function RemixPage() {
   const { lists, loaded, refetch, createList, deleteList, renameList } = useSavedLists()
   const { posts: manualPosts, addPost } = useManualPosts('remix')
-  const [selectedList, setSelectedList] = useState<SavedList | null>(null)
+  const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [listsOpen, setListsOpen] = useState(false)
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  // Force refetch on mount to fix Next.js router cache issue
-  // (refetch is stable, so this only runs once)
+  const selectedList = selectedListId ? (lists.find((l) => l.id === selectedListId) ?? null) : null
 
   const filteredLists = useMemo(() => {
     if (!query.trim()) return lists
@@ -148,23 +147,13 @@ export default function RemixPage() {
             </button>
 
             {/* Lists management */}
-            {lists.length > 0 ? (
-              <button
-                onClick={() => setListsOpen(true)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
-              >
-                <BookmarkIcon size={13} />
-                Lists
-              </button>
-            ) : (
-              <button
-                onClick={() => setListsOpen(true)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
-              >
-                <BookmarkIcon size={13} />
-                Lists
-              </button>
-            )}
+            <button
+              onClick={() => setListsOpen(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+            >
+              <BookmarkIcon size={13} />
+              Lists
+            </button>
           </div>
         </div>
 
@@ -191,7 +180,7 @@ export default function RemixPage() {
             columnClassName="pl-4 bg-clip-padding"
           >
             {filteredLists.map((list) => (
-              <ListCard key={list.id} list={list} onClick={() => setSelectedList(list)} />
+              <ListCard key={list.id} list={list} onClick={() => { refetch(); setSelectedListId(list.id) }} />
             ))}
             {filteredPosts.map((post) => (
               <PostCard key={post.id} post={post} feedId="remix" />
@@ -201,7 +190,7 @@ export default function RemixPage() {
       </div>
 
       {selectedList && (
-        <ListDetailPanel list={selectedList} onClose={() => setSelectedList(null)} />
+        <ListDetailPanel list={selectedList} onClose={() => setSelectedListId(null)} />
       )}
 
       {listsOpen && (
