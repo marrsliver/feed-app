@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { Post } from '@/lib/types'
+import { isSafeUrl } from '@/lib/safe-url'
 
 function urlId(url: string) {
   return createHash('sha1').update(url).digest('hex').slice(0, 16)
@@ -69,6 +70,7 @@ export async function GET(req: Request) {
   const page = parseInt(searchParams.get('page') ?? '1', 10)
 
   if (!feedUrl) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
+  if (!isSafeUrl(feedUrl)) return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
 
   try {
     const baseUrl = new URL(feedUrl).origin
@@ -158,6 +160,7 @@ export async function GET(req: Request) {
     // RSS returned items — WordPress sites have more pages via REST API
     return NextResponse.json({ posts, feedTitle, hasMore: isWordPress })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[api/rss]', err)
+    return NextResponse.json({ error: 'Failed to fetch feed' }, { status: 500 })
   }
 }

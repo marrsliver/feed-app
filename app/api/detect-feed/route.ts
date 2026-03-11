@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio'
 import { NextResponse } from 'next/server'
+import { isSafeUrl } from '@/lib/safe-url'
 
 const COMMON_FEED_PATHS = ['/feed', '/rss', '/feed.xml', '/atom.xml', '/rss.xml', '/index.xml']
 
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
   const url = searchParams.get('url')
 
   if (!url) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
+  if (!isSafeUrl(url)) return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
 
   // 1. Try the URL itself as a feed
   const direct = await tryFeedUrl(url)

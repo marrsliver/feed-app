@@ -6,7 +6,7 @@ export async function GET() {
     .from('user_sources')
     .select('*')
     .order('added_at', { ascending: true })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json(
     (data ?? []).map((r) => ({
       id: r.id,
@@ -45,6 +45,6 @@ export async function POST(req: Request) {
       category_id: categoryId ?? null,
       tags: tags ?? [],
     })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
 }

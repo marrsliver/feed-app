@@ -20,13 +20,16 @@ export async function POST(req: Request) {
   try {
     const { query, posts }: SuggestRequest = await req.json()
 
-    if (!query?.trim() || !posts?.length) {
+    if (!query?.trim() || !Array.isArray(posts) || !posts.length) {
       return NextResponse.json({ error: 'Missing query or posts' }, { status: 400 })
     }
+    if (typeof query !== 'string') {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    }
 
-    // Limit to 150 posts to keep tokens reasonable
+    // Limit to 150 posts, truncate all fields to keep tokens reasonable
     const postList = posts.slice(0, 150).map((p) =>
-      `ID: ${p.id}\nTitle: ${p.title}\nSource: ${p.sourceName}\nDate: ${p.date}${p.excerpt ? `\nExcerpt: ${p.excerpt.slice(0, 150)}` : ''}`
+      `ID: ${String(p.id ?? '').slice(0, 100)}\nTitle: ${String(p.title ?? '').slice(0, 200)}\nSource: ${String(p.sourceName ?? '').slice(0, 100)}\nDate: ${String(p.date ?? '').slice(0, 30)}${p.excerpt ? `\nExcerpt: ${String(p.excerpt).slice(0, 150)}` : ''}`
     ).join('\n\n')
 
     const message = await client.messages.create({
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
           role: 'user',
           content: `You are a research assistant helping a user find relevant articles from their personal feed.
 
-The user's request: "${query}"
+The user's request: "${query.slice(0, 500).replace(/"/g, '\\"')}"
 
 Here are the available articles:
 

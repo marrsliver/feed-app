@@ -5,13 +5,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const { text } = await req.json()
   const { error } = await getSupabase().from('comments').update({ text }).eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { error } = await getSupabase().from('comments').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
 }

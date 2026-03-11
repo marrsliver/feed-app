@@ -9,13 +9,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.postIds !== undefined) update.post_ids = body.postIds
   if (body.postData !== undefined) update.post_data = body.postData
   const { error } = await getSupabase().from('saved_lists').update(update).eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { error } = await getSupabase().from('saved_lists').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
 }

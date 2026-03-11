@@ -1,11 +1,13 @@
 import * as cheerio from 'cheerio'
 import { NextResponse } from 'next/server'
+import { isSafeUrl } from '@/lib/safe-url'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const url = searchParams.get('url')
 
   if (!url) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
+  if (!isSafeUrl(url)) return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
 
   try {
     const res = await fetch(url, {
@@ -40,6 +42,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ title, image, description, siteName })
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('[api/og]', err)
+    return NextResponse.json({ error: 'Failed to fetch page' }, { status: 500 })
   }
 }

@@ -6,7 +6,7 @@ export async function GET() {
     .from('deleted_posts')
     .select('*')
     .order('deleted_at', { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json(
     (data ?? []).map((r) => ({
       post: r.post_data,
@@ -22,6 +22,6 @@ export async function POST(req: Request) {
   const { error } = await getSupabase()
     .from('deleted_posts')
     .upsert({ post_id: post.id, post_data: post, feed_id: feedId, was_manual: wasManual, deleted_at: deletedAt })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
 }

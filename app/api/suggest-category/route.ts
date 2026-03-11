@@ -4,10 +4,16 @@ import Anthropic from '@anthropic-ai/sdk'
 const client = new Anthropic()
 
 export async function POST(req: Request) {
-  const { name, url, availableCategories } = await req.json()
+  const body = await req.json()
+  const { name, url, availableCategories } = body
+
+  if (!name || !url || !Array.isArray(availableCategories)) {
+    return NextResponse.json({ categoryId: null, confidence: 'low' })
+  }
 
   const categoryList = availableCategories
-    .map((c: { id: string; name: string }) => `- ${c.id}: ${c.name}`)
+    .slice(0, 50)
+    .map((c: { id: string; name: string }) => `- ${String(c.id).slice(0, 50)}: ${String(c.name).slice(0, 100)}`)
     .join('\n')
 
   try {
