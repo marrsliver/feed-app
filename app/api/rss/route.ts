@@ -151,6 +151,9 @@ export async function GET(req: Request) {
       })
     })
 
+    // Cap at 20 most recent items to keep diversity balanced in the feed
+    posts.splice(20)
+
     // If RSS returned nothing and this looks like WordPress, try the REST API
     if (posts.length === 0 && isWordPress) {
       const { posts: wpPosts, hasMore } = await tryWordPressApi(baseUrl, sourceId, sourceName, sourceColor, 1)
