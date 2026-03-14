@@ -260,10 +260,6 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
       {/* Toolbar */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
         <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <SearchBar value={query} onChange={setQuery} />
-          </div>
-
           {/* Sources button — research feed only */}
           {showSources && (
             <button
@@ -274,6 +270,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
               Sources
             </button>
           )}
+
+          <div className="flex-1">
+            <SearchBar value={query} onChange={setQuery} />
+          </div>
 
           {/* Add button: opens sources sidebar for research feed, add link panel otherwise */}
           <button
