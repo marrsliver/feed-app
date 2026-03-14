@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, Tag, List } from 'lucide-react'
 import Masonry from 'react-masonry-css'
-import type { LibrarySource, SourceCategory, SourceList } from '@/lib/types'
+import type { LibrarySource, SourceCategory, SourceList, Post, SavedList } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { SourcePanel } from './SourcePanel'
 import { TagPromotionModal } from './TagPromotionModal'
@@ -20,8 +20,12 @@ interface Props {
   onToggleSourceInList: (listId: string, sourceId: string) => void
   onCreateSourceList: (name: string) => string
   onCreateCategory: (name: string) => string
+  onToggleFeed: (id: string) => void
   onShowLibrary: () => void
   onClose: () => void
+  allFeedPosts?: Post[]
+  savedLists?: SavedList[]
+  isRead?: (id: string) => boolean
 }
 
 type SortMode = 'name' | 'newest' | 'oldest'
@@ -45,10 +49,15 @@ export function SourcesCardsView({
   onToggleSourceInList,
   onCreateSourceList,
   onCreateCategory,
+  onToggleFeed,
   onShowLibrary,
   onClose,
+  allFeedPosts,
+  savedLists,
+  isRead,
 }: Props) {
-  const [selected, setSelected] = useState<LibrarySource | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = selectedId ? sources.find(s => s.id === selectedId) ?? null : null
   const [promotingTag, setPromotingTag] = useState<string | null>(null)
   const [tagPanel, setTagPanel] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState<string | null>(null)
@@ -246,7 +255,7 @@ export function SourcesCardsView({
                 <div
                   className="bg-white overflow-hidden transition-all duration-300 cursor-pointer"
                   style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
-                  onClick={() => setSelected(s)}
+                  onClick={() => setSelectedId(s.id)}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.1)'
                   }}
@@ -315,14 +324,18 @@ export function SourcesCardsView({
                         <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 border border-black/10 px-1.5 py-0.5">
                           {s.isStatic ? 'Built-in' : 'User added'}
                         </span>
-                        <span className={`flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${
-                          s.inFeed
-                            ? 'border-black/20 text-black/50'
-                            : 'border-black/10 text-black/25'
-                        }`}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onToggleFeed(s.id) }}
+                          className={`flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border transition-colors ${
+                            s.inFeed
+                              ? 'border-black/20 text-black/50 hover:border-black/40 hover:text-black'
+                              : 'border-black/10 text-black/25 hover:border-black/20 hover:text-black/40'
+                          }`}
+                          title={s.inFeed ? 'Move to list only' : 'Add to feed'}
+                        >
                           {s.inFeed ? <Rss size={8} /> : <BookOpen size={8} />}
                           {s.inFeed ? 'In feed' : 'List only'}
-                        </span>
+                        </button>
                       </div>
                       {noteCount > 0 && (
                         <span className="flex items-center gap-1 text-[9px] text-black/30">
@@ -354,10 +367,13 @@ export function SourcesCardsView({
           onRemoveTag={onRemoveTag}
           onToggleSourceInList={onToggleSourceInList}
           onCreateSourceList={onCreateSourceList}
-          onPromoteTag={(tag) => { setSelected(null); setPromotingTag(tag) }}
-          onTagClick={(tag) => { setSelected(null); setTagPanel(tag) }}
+          onPromoteTag={(tag) => { setSelectedId(null); setPromotingTag(tag) }}
+          onTagClick={(tag) => { setSelectedId(null); setTagPanel(tag) }}
           onCreateCategory={onCreateCategory}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
+          allFeedPosts={allFeedPosts}
+          savedLists={savedLists}
+          isRead={isRead}
         />
       )}
 

@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, ArrowUpRight, Pencil, Check, Trash2, Plus } from 'lucide-react'
+import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
-import type { LibrarySource, SourceCategory, SourceList } from '@/lib/types'
+import type { LibrarySource, SourceCategory, SourceList, Post, SavedList } from '@/lib/types'
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -91,12 +91,16 @@ interface Props {
   onTagClick?: (tag: string) => void
   onCreateCategory: (name: string) => string
   onClose: () => void
+  allFeedPosts?: Post[]
+  savedLists?: SavedList[]
+  isRead?: (id: string) => boolean
 }
 
-export function SourcePanel({ source, categories, allTags, sourceLists, onSetCategory, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onClose }: Props) {
+export function SourcePanel({ source, categories, allTags, sourceLists, onSetCategory, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onClose, allFeedPosts, savedLists, isRead }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
+  const [savedReadOpen, setSavedReadOpen] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -141,11 +145,22 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
     ? allTags.filter((t) => t.includes(tagInput.toLowerCase()) && !source.tags.includes(t))
     : allTags.filter((t) => !source.tags.includes(t))
 
-  return (
-    <>
-      <div className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[1px]" onClick={onClose} />
+  // Saved & Read
+  const savedByList = (savedLists ?? []).map(list => ({
+    id: list.id,
+    name: list.name,
+    posts: list.postIds
+      .filter(id => list.postData[id]?.sourceId === source.id)
+      .map(id => list.postData[id]),
+  })).filter(g => g.posts.length > 0)
+  const allSavedIds = new Set((savedLists ?? []).flatMap(l => l.postIds))
+  const readOnlyPosts = (allFeedPosts ?? []).filter(
+    p => p.sourceId === source.id && (isRead ? isRead(p.id) : false) && !allSavedIds.has(p.id)
+  )
+  const savedReadTotal = savedByList.reduce((n, g) => n + g.posts.length, 0) + readOnlyPosts.length
 
-      <div className="fixed top-0 right-0 h-full w-full max-w-md z-[70] bg-white flex flex-col overflow-hidden">
+  return (
+    <div className="fixed top-0 right-0 h-full w-full max-w-md z-[70] bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10">
         {/* Color bar */}
         <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: source.color }} />
 
@@ -450,8 +465,53 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
               </div>
             </div>
           </div>
+
+          {/* Saved & Read */}
+          {savedReadTotal > 0 && (
+            <>
+              <div className="border-t border-black/10 mx-5" />
+              <div className="px-5 py-5 space-y-3">
+                <button
+                  onClick={() => setSavedReadOpen(v => !v)}
+                  className="flex items-center gap-1.5 w-full text-left"
+                >
+                  {savedReadOpen ? <ChevronDown size={12} className="text-black/30" /> : <ChevronRight size={12} className="text-black/30" />}
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                    Saved & Read ({savedReadTotal})
+                  </h3>
+                </button>
+                {savedReadOpen && (
+                  <div className="space-y-3">
+                    {savedByList.map(group => (
+                      <div key={group.id}>
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 mb-1">{group.name}</p>
+                        <div className="space-y-1.5">
+                          {group.posts.map(post => (
+                            <a key={post.id} href={post.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-black/60 hover:text-black transition-colors leading-snug line-clamp-2">
+                              {post.title}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {readOnlyPosts.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 mb-1">Read</p>
+                        <div className="space-y-1.5">
+                          {readOnlyPosts.map(post => (
+                            <a key={post.id} href={post.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-black/60 hover:text-black transition-colors leading-snug line-clamp-2">
+                              {post.title}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      </div>
-    </>
+    </div>
   )
 }

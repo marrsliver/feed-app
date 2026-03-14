@@ -3,9 +3,9 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss } from 'lucide-react'
+import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss, Shuffle } from 'lucide-react'
 import type { LibrarySource, PostsApiResponse, Post } from '@/lib/types'
-import { rankPosts } from '@/lib/rankPosts'
+import { rankPosts, rankPostsDiversified } from '@/lib/rankPosts'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
 import { SearchBar } from './SearchBar'
@@ -16,6 +16,7 @@ import { ArchivePanel } from './ArchivePanel'
 import { SourcesSidebar } from './SourcesSidebar'
 import { SourcesCardsView } from './SourcesCardsView'
 import { SourcePanel } from './SourcePanel'
+import { SelectSourcesModal } from './SelectSourcesModal'
 import { TagSourcesPanel } from './TagSourcesPanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
 import { useLibrarySources } from '@/hooks/useLibrarySources'
@@ -29,6 +30,7 @@ import { useReadPosts } from '@/hooks/useReadPosts'
 interface Props {
   feedId: string
   showSources?: boolean
+  openSourcesCards?: number
 }
 
 async function fetchPosts(
@@ -68,7 +70,7 @@ async function fetchUserSourcePosts(source: LibrarySource, page: number): Promis
   return { posts: data.posts ?? [], hasMore: data.hasMore ?? false }
 }
 
-export function Feed({ feedId, showSources }: Props) {
+export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsProp }: Props) {
   const [activeSources, setActiveSources] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [view, setView] = useState<string>('all')
@@ -81,7 +83,18 @@ export function Feed({ feedId, showSources }: Props) {
   const [sidebarSelectedSource, setSidebarSelectedSource] = useState<LibrarySource | null>(null)
   const [sidebarTagPanel, setSidebarTagPanel] = useState<string | null>(null)
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
+  const [isRandomized, setIsRandomized] = useState(false)
+  const [selectSourcesOpen, setSelectSourcesOpen] = useState(false)
   const { isRead, markRead } = useReadPosts()
+
+  // Open sources cards view when triggered by parent (e.g. header tab)
+  const prevOpenTick = useRef(0)
+  useEffect(() => {
+    if (openSourcesCardsProp && openSourcesCardsProp !== prevOpenTick.current) {
+      prevOpenTick.current = openSourcesCardsProp
+      setSourcesCardsOpen(true)
+    }
+  }, [openSourcesCardsProp])
 
   const {
     sources: allSources,
@@ -223,7 +236,7 @@ export function Feed({ feedId, showSources }: Props) {
     .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
-  const allPosts = rankPosts(filtered)
+  const allPosts = isRandomized ? rankPostsDiversified(filtered) : rankPosts(filtered)
   const activeList = lists.find((l) => l.id === view)
   const listFiltered =
     view === 'all'
@@ -236,11 +249,11 @@ export function Feed({ feedId, showSources }: Props) {
   const isFiltering = view !== 'all'
   const unreadCount = allPosts.filter((p) => !isRead(p.id)).length
 
-  // Sources for the filter bar (static + user in-feed for this feedId)
+  // Sources for the filter bar (static + user in-feed for this feedId), alphabetized
   const filterSources = useMemo(() => [
     ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl })),
     ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl })),
-  ], [feedStaticSources, feedUserSources])
+  ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
 
   return (
     <div className="space-y-4">
@@ -262,14 +275,38 @@ export function Feed({ feedId, showSources }: Props) {
             </button>
           )}
 
-          {/* Add link button */}
+          {/* Add button: opens sources sidebar for research feed, add link panel otherwise */}
           <button
-            onClick={() => setAddLinkOpen(true)}
+            onClick={() => showSources ? setSourcesOpen(true) : setAddLinkOpen(true)}
             className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
           >
             <LinkIcon size={13} />
             Add
           </button>
+
+          {/* Randomize button */}
+          <button
+            onClick={() => setIsRandomized(v => !v)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
+              isRandomized
+                ? 'bg-black text-white border-black'
+                : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
+            }`}
+            title="Toggle recency bias"
+          >
+            <Shuffle size={13} />
+            Shuffle
+          </button>
+
+          {/* Select Sources button */}
+          {filterSources.length > 1 && (
+            <button
+              onClick={() => setSelectSourcesOpen(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+            >
+              Filter
+            </button>
+          )}
 
           {/* Ask for help button */}
           <button
@@ -349,6 +386,7 @@ export function Feed({ feedId, showSources }: Props) {
         <SourcesSidebar
           feedId={feedId}
           staticSources={feedStaticSources}
+          allStaticSources={staticSources}
           userSources={userSources}
           categories={categories}
           onAddSource={addSource}
@@ -378,8 +416,12 @@ export function Feed({ feedId, showSources }: Props) {
           onToggleSourceInList={toggleSourceInList}
           onCreateSourceList={createSourceList}
           onCreateCategory={createCategory}
+          onToggleFeed={toggleFeed}
           onShowLibrary={() => { setSourcesOpen(true) }}
           onClose={() => setSourcesCardsOpen(false)}
+          allFeedPosts={allPosts}
+          savedLists={lists}
+          isRead={isRead}
         />
       )}
 
@@ -418,6 +460,9 @@ export function Feed({ feedId, showSources }: Props) {
           onTagClick={(tag) => { setSidebarSelectedSource(null); setSidebarTagPanel(tag) }}
           onCreateCategory={createCategory}
           onClose={() => setSidebarSelectedSource(null)}
+          allFeedPosts={allPosts}
+          savedLists={lists}
+          isRead={isRead}
         />
       )}
 
@@ -433,6 +478,16 @@ export function Feed({ feedId, showSources }: Props) {
           onRemoveTag={removeTag}
           onCreateCategory={createCategory}
           onClose={() => setSidebarTagPanel(null)}
+        />
+      )}
+
+      {/* Select Sources modal */}
+      {selectSourcesOpen && (
+        <SelectSourcesModal
+          sources={filterSources}
+          activeSources={activeSources}
+          onConfirm={(selected) => setActiveSources(selected)}
+          onClose={() => setSelectSourcesOpen(false)}
         />
       )}
 

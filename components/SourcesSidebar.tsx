@@ -7,6 +7,7 @@ import type { LibrarySource, SourceCategory } from '@/lib/types'
 interface Props {
   feedId: string
   staticSources: LibrarySource[]
+  allStaticSources?: LibrarySource[]
   userSources: LibrarySource[]
   categories: SourceCategory[]
   onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => void
@@ -45,8 +46,13 @@ function SourceRow({
   onOpenSource?: (id: string) => void
   showKind: boolean
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   return (
-    <div className="flex items-center gap-2.5 py-1.5 group">
+    <div
+      className="flex items-center gap-2.5 py-1.5 group"
+      onMouseLeave={() => setConfirmDelete(false)}
+    >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
@@ -82,20 +88,39 @@ function SourceRow({
           >
             {s.inFeed ? <Rss size={11} /> : <BookOpen size={11} />}
           </button>
-          <button
-            onClick={() => onRemoveSource(s.id)}
-            className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-red-500 transition-all"
-            aria-label="Remove source"
-          >
-            <Trash2 size={11} />
-          </button>
+          {confirmDelete ? (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => onRemoveSource(s.id)}
+                className="px-1.5 py-0.5 text-[9px] font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                Delete?
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="p-1 text-black/30 hover:text-black transition-colors text-xs leading-none"
+                aria-label="Cancel delete"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-red-500 transition-all"
+              aria-label="Remove source"
+            >
+              <Trash2 size={11} />
+            </button>
+          )}
         </>
       )}
     </div>
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
+export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
+  const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
@@ -172,6 +197,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
 
   // Build display lists
   const allStatic: DisplaySource[] = staticSources.map((s) => ({ kind: 'static', id: s.id, name: s.name, url: s.url, color: s.color }))
+  const allLibraryStatic: DisplaySource[] = libraryStaticSources.map((s) => ({ kind: 'static', id: s.id, name: s.name, url: s.url, color: s.color }))
   const allUser: DisplaySource[] = userSources.map((s) => ({ kind: 'user', id: s.id, name: s.name, url: s.url, color: s.color, inFeed: s.inFeed }))
 
   const byName = (a: DisplaySource, b: DisplaySource) => a.name.localeCompare(b.name)
@@ -179,9 +205,9 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
   const feedList = [...allStatic, ...allUser.filter((s) => s.kind === 'user' && (s as { inFeed: boolean }).inFeed)].sort(byName)
   const listOnlyList = allUser.filter((s) => s.kind === 'user' && !(s as { inFeed: boolean }).inFeed).sort(byName)
 
-  // Build grouped hierarchy for library tab
-  const allLibrary = [...allStatic, ...allUser].sort(byName)
-  const allLibrarySources = [...staticSources, ...userSources]
+  // Build grouped hierarchy for library tab (uses all static sources across feed groups)
+  const allLibrary = [...allLibraryStatic, ...allUser].sort(byName)
+  const allLibrarySources = [...libraryStaticSources, ...userSources]
   type GroupedCategory = { categoryId: string; categoryName: string; items: DisplaySource[] }
   const grouped: GroupedCategory[] = []
   const uncategorized: DisplaySource[] = []
@@ -249,7 +275,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
         </div>
 
         {/* Source list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
           {tab === 'library' ? (
             allLibrary.length === 0 ? (
               <p className="text-center py-10 text-black/25 text-xs">No sources yet.</p>
@@ -302,7 +328,7 @@ export function SourcesSidebar({ feedId, staticSources, userSources, categories,
         </div>
 
         {/* Add source */}
-        <div className="px-4 py-4 border-t border-black/10 space-y-3">
+        <div className="px-4 py-4 border-t border-black/10 space-y-3 shrink-0">
           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30">Add a source</p>
 
           {detect.status === 'confirm' ? (
