@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
-import type { LibrarySource, SourceCategory, SourceList, Post, SavedList } from '@/lib/types'
+import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, SavedList } from '@/lib/types'
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -80,9 +80,11 @@ function NoteRow({
 interface Props {
   source: LibrarySource
   categories: SourceCategory[]
+  industries?: SourceIndustry[]
   allTags: string[]
   sourceLists?: SourceList[]
   onSetCategory: (id: string, categoryId: string | null) => void
+  onSetIndustry?: (id: string, industryId: string | null) => void
   onAddTag: (id: string, tag: string) => void
   onRemoveTag: (id: string, tag: string) => void
   onToggleSourceInList?: (listId: string, sourceId: string) => void
@@ -90,6 +92,7 @@ interface Props {
   onPromoteTag?: (tag: string) => void
   onTagClick?: (tag: string) => void
   onCreateCategory: (name: string) => string
+  onCreateIndustry?: (name: string) => string
   onRenameSource?: (id: string, name: string) => void
   onClose: () => void
   topLayer?: boolean
@@ -98,7 +101,7 @@ interface Props {
   isRead?: (id: string) => boolean
 }
 
-export function SourcePanel({ source, categories, allTags, sourceLists, onSetCategory, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onRenameSource, onClose, topLayer, allFeedPosts, savedLists, isRead }: Props) {
+export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onClose, topLayer, allFeedPosts, savedLists, isRead }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
@@ -107,12 +110,15 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
   const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [addingIndustry, setAddingIndustry] = useState(false)
+  const [newIndustryName, setNewIndustryName] = useState('')
   const [newListName, setNewListName] = useState('')
   const [addingList, setAddingList] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(source.name)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
+  const newIndustryRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   function handleSaveRename() {
@@ -128,6 +134,15 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
     onSetCategory(source.id, id)
     setAddingCategory(false)
     setNewCategoryName('')
+  }
+
+  function handleCreateIndustry() {
+    const name = newIndustryName.trim()
+    if (!name || !onCreateIndustry) return
+    const id = onCreateIndustry(name)
+    onSetIndustry?.(source.id, id)
+    setAddingIndustry(false)
+    setNewIndustryName('')
   }
 
   useEffect(() => {
@@ -225,10 +240,70 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
               )}
             </div>
 
-            {/* Category selector */}
+            {/* Industry selector */}
+            {(industries.length > 0 || onCreateIndustry) && (
+              <div className="space-y-1">
+                <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
+                  Industry
+                </label>
+                {addingIndustry ? (
+                  <div className="flex gap-1.5">
+                    <input
+                      ref={newIndustryRef}
+                      value={newIndustryName}
+                      onChange={(e) => setNewIndustryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateIndustry()
+                        if (e.key === 'Escape') { setAddingIndustry(false); setNewIndustryName('') }
+                      }}
+                      autoFocus
+                      placeholder="New industry name…"
+                      className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                    />
+                    <button
+                      onClick={handleCreateIndustry}
+                      disabled={!newIndustryName.trim()}
+                      className="px-2 py-1.5 text-xs bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30"
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => { setAddingIndustry(false); setNewIndustryName('') }}
+                      className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1.5">
+                    <select
+                      value={source.industryId ?? ''}
+                      onChange={(e) => onSetIndustry?.(source.id, e.target.value || null)}
+                      className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+                    >
+                      <option value="">— None —</option>
+                      {industries.map((i) => (
+                        <option key={i.id} value={i.id}>{i.name}</option>
+                      ))}
+                    </select>
+                    {onCreateIndustry && (
+                      <button
+                        onClick={() => setAddingIndustry(true)}
+                        className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
+                        title="Add new industry"
+                      >
+                        <Plus size={11} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Org Type selector */}
             <div className="space-y-1">
               <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
-                Category
+                Org Type
               </label>
               {addingCategory ? (
                 <div className="flex gap-1.5">
@@ -241,7 +316,7 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
                       if (e.key === 'Escape') { setAddingCategory(false); setNewCategoryName('') }
                     }}
                     autoFocus
-                    placeholder="New category name…"
+                    placeholder="New org type name…"
                     className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
                   />
                   <button
@@ -273,7 +348,7 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
                   <button
                     onClick={() => setAddingCategory(true)}
                     className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:border-black/30 hover:text-black transition-colors"
-                    title="Add new category"
+                    title="Add new org type"
                   >
                     <Plus size={11} />
                   </button>
@@ -310,9 +385,9 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
                       {onPromoteTag && (
                         <button
                           onClick={() => onPromoteTag(tag)}
-                          title="Promote to category"
+                          title="Promote to org type"
                           className="text-black/20 hover:text-black/50 transition-colors leading-none ml-0.5"
-                          aria-label={`Promote ${tag} to category`}
+                          aria-label={`Promote ${tag} to org type`}
                         >
                           ↑
                         </button>

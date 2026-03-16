@@ -51,7 +51,7 @@ export function TagPromotionModal({ tag, sources, categories, onConfirm, onClose
         <div className="bg-white w-full max-w-sm pointer-events-auto shadow-xl animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
-            <h2 className="text-sm font-semibold text-black">Promote tag to category</h2>
+            <h2 className="text-sm font-semibold text-black">Promote tag to org type</h2>
             <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
               <X size={16} />
             </button>
@@ -91,7 +91,7 @@ export function TagPromotionModal({ tag, sources, categories, onConfirm, onClose
 
             {/* Mode toggle */}
             <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40 mb-2">Category</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40 mb-2">Org Type</p>
               <div className="flex gap-1 mb-3">
                 <button
                   onClick={() => setMode('new')}
@@ -115,7 +115,7 @@ export function TagPromotionModal({ tag, sources, categories, onConfirm, onClose
                 <input
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="Category name…"
+                  placeholder="Org type name…"
                   className="w-full text-xs border border-black/15 px-3 py-2 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
                 />
               ) : (
@@ -124,7 +124,7 @@ export function TagPromotionModal({ tag, sources, categories, onConfirm, onClose
                   onChange={(e) => setSelectedExisting(e.target.value)}
                   className="w-full text-xs border border-black/15 px-2 py-2 outline-none focus:border-black/40 transition-colors bg-white"
                 >
-                  <option value="">— Select a category —</option>
+                  <option value="">— Select an org type —</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -133,7 +133,7 @@ export function TagPromotionModal({ tag, sources, categories, onConfirm, onClose
             </div>
 
             <p className="text-[10px] text-black/40">
-              The tag will be removed from all affected sources and replaced with this category.
+              The tag will be removed from all affected sources and replaced with this org type.
             </p>
 
             {/* Actions */}

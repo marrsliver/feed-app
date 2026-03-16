@@ -162,6 +162,11 @@ export function useLibrarySources() {
     persist(`/api/db/user-sources/${id}`, 'PATCH', { categoryId })
   }, [updateSources])
 
+  const setIndustry = useCallback((id: string, industryId: string | null) => {
+    updateSources((prev) => prev.map((s) => (s.id === id ? { ...s, industryId: industryId ?? undefined } : s)))
+    persist(`/api/db/user-sources/${id}`, 'PATCH', { industryId })
+  }, [updateSources])
+
   const addTag = useCallback((id: string, tag: string) => {
     updateSources((prev) => {
       return prev.map((s) => {
@@ -195,6 +200,7 @@ export function useLibrarySources() {
     renameSource,
     toggleFeed,
     setCategory,
+    setIndustry,
     addTag,
     removeTag,
   }

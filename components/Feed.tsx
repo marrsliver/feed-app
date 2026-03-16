@@ -22,6 +22,7 @@ import { useSavedLists } from '@/hooks/useSavedLists'
 import { useLibrarySources } from '@/hooks/useLibrarySources'
 import { useSourceLists } from '@/hooks/useSourceLists'
 import { useSourceCategories } from '@/hooks/useSourceCategories'
+import { useSourceIndustries } from '@/hooks/useSourceIndustries'
 import { useManualPosts } from '@/hooks/useManualPosts'
 import { useDeletedPosts } from '@/hooks/useDeletedPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
@@ -126,12 +127,14 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     renameSource,
     toggleFeed,
     setCategory,
+    setIndustry,
     addTag,
     removeTag,
   } = useLibrarySources()
 
   const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
   const { categories, createCategory } = useSourceCategories()
+  const { industries, createIndustry } = useSourceIndustries()
   const { lists, createList, deleteList, renameList } = useSavedLists()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
@@ -448,14 +451,17 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         <SourcesCardsView
           sources={allSources}
           categories={categories}
+          industries={industries}
           allTags={allTags}
           sourceLists={sourceLists}
           onSetCategory={setCategory}
+          onSetIndustry={setIndustry}
           onAddTag={addTag}
           onRemoveTag={removeTag}
           onToggleSourceInList={toggleSourceInList}
           onCreateSourceList={createSourceList}
           onCreateCategory={createCategory}
+          onCreateIndustry={createIndustry}
           onToggleFeed={toggleFeed}
           onRenameSource={renameSource}
           onShowLibrary={() => { setSourcesOpen(true) }}
@@ -490,9 +496,11 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         <SourcePanel
           source={sidebarSelectedSource}
           categories={categories}
+          industries={industries}
           allTags={allTags}
           sourceLists={sourceLists}
           onSetCategory={setCategory}
+          onSetIndustry={setIndustry}
           onAddTag={addTag}
           onRemoveTag={removeTag}
           onToggleSourceInList={toggleSourceInList}
@@ -500,6 +508,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onPromoteTag={(tag) => { setSidebarSelectedSource(null); /* promotion not supported from sidebar context */ }}
           onTagClick={(tag) => { setSidebarSelectedSource(null); setSidebarTagPanel(tag) }}
           onCreateCategory={createCategory}
+          onCreateIndustry={createIndustry}
           onRenameSource={renameSource}
           onClose={() => { setSidebarSelectedSource(null); setSourceOpenedFromPost(false) }}
           topLayer={sourceOpenedFromPost}

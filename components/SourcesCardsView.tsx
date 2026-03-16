@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, Tag, List, Pencil } from 'lucide-react'
 import Masonry from 'react-masonry-css'
-import type { LibrarySource, SourceCategory, SourceList, Post, SavedList } from '@/lib/types'
+import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, SavedList } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { SourcePanel } from './SourcePanel'
 import { TagPromotionModal } from './TagPromotionModal'
@@ -12,14 +12,17 @@ import { TagSourcesPanel } from './TagSourcesPanel'
 interface Props {
   sources: LibrarySource[]
   categories: SourceCategory[]
+  industries?: SourceIndustry[]
   allTags: string[]
   sourceLists: SourceList[]
   onSetCategory: (id: string, categoryId: string | null) => void
+  onSetIndustry?: (id: string, industryId: string | null) => void
   onAddTag: (id: string, tag: string) => void
   onRemoveTag: (id: string, tag: string) => void
   onToggleSourceInList: (listId: string, sourceId: string) => void
   onCreateSourceList: (name: string) => string
   onCreateCategory: (name: string) => string
+  onCreateIndustry?: (name: string) => string
   onToggleFeed: (id: string) => void
   onRenameSource?: (id: string, name: string) => void
   onShowLibrary: () => void
@@ -221,14 +224,17 @@ const BREAKPOINTS = {
 export function SourcesCardsView({
   sources,
   categories,
+  industries = [],
   allTags,
   sourceLists,
   onSetCategory,
+  onSetIndustry,
   onAddTag,
   onRemoveTag,
   onToggleSourceInList,
   onCreateSourceList,
   onCreateCategory,
+  onCreateIndustry,
   onToggleFeed,
   onRenameSource,
   onShowLibrary,
@@ -269,25 +275,59 @@ export function SourcesCardsView({
     return list
   }, [sources, filterCategory, filterTag, filterList, sort, sourceLists])
 
-  // Group by category alphabetically when in name-sort mode with no active filters
+  // Two-level grouped view: Industry → Org Type → sources
+  // Active when name-sorted and no filters applied
   const groupedView = useMemo(() => {
     if (sort !== 'name' || filterCategory || filterTag || filterList) return null
-    const catMap = new Map<string, { catId: string; catName: string; sources: LibrarySource[] }>()
-    const uncategorized: LibrarySource[] = []
+
+    type OrgGroup = { catId: string; catName: string; sources: LibrarySource[] }
+    type IndustryGroup = { indId: string; indName: string; orgGroups: OrgGroup[]; ungrouped: LibrarySource[] }
+
+    const indMap = new Map<string, IndustryGroup>()
+    const noIndustry: { catMap: Map<string, OrgGroup>; ungrouped: LibrarySource[] } = { catMap: new Map(), ungrouped: [] }
+
     for (const s of filteredSorted) {
-      if (s.categoryId) {
-        if (!catMap.has(s.categoryId)) {
-          const cat = categories.find((c) => c.id === s.categoryId)
-          catMap.set(s.categoryId, { catId: s.categoryId, catName: cat?.name ?? s.categoryId, sources: [] })
+      if (s.industryId) {
+        if (!indMap.has(s.industryId)) {
+          const ind = industries.find((i) => i.id === s.industryId)
+          indMap.set(s.industryId, { indId: s.industryId, indName: ind?.name ?? s.industryId, orgGroups: [], ungrouped: [] })
         }
-        catMap.get(s.categoryId)!.sources.push(s)
+        const indGroup = indMap.get(s.industryId)!
+        if (s.categoryId) {
+          let og = indGroup.orgGroups.find((g) => g.catId === s.categoryId)
+          if (!og) {
+            const cat = categories.find((c) => c.id === s.categoryId)
+            og = { catId: s.categoryId, catName: cat?.name ?? s.categoryId, sources: [] }
+            indGroup.orgGroups.push(og)
+          }
+          og.sources.push(s)
+        } else {
+          indGroup.ungrouped.push(s)
+        }
       } else {
-        uncategorized.push(s)
+        if (s.categoryId) {
+          if (!noIndustry.catMap.has(s.categoryId)) {
+            const cat = categories.find((c) => c.id === s.categoryId)
+            noIndustry.catMap.set(s.categoryId, { catId: s.categoryId, catName: cat?.name ?? s.categoryId, sources: [] })
+          }
+          noIndustry.catMap.get(s.categoryId)!.sources.push(s)
+        } else {
+          noIndustry.ungrouped.push(s)
+        }
       }
     }
-    const groups = Array.from(catMap.values()).sort((a, b) => a.catName.localeCompare(b.catName))
-    return { groups, uncategorized }
-  }, [filteredSorted, categories, sort, filterCategory, filterTag, filterList])
+
+    const industryGroups = Array.from(indMap.values())
+      .sort((a, b) => a.indName.localeCompare(b.indName))
+      .map((g) => ({
+        ...g,
+        orgGroups: g.orgGroups.sort((a, b) => a.catName.localeCompare(b.catName)),
+      }))
+
+    const otherOrgGroups = Array.from(noIndustry.catMap.values()).sort((a, b) => a.catName.localeCompare(b.catName))
+
+    return { industryGroups, otherOrgGroups, otherUngrouped: noIndustry.ungrouped }
+  }, [filteredSorted, categories, industries, sort, filterCategory, filterTag, filterList])
 
   function handlePromoteTag(tag: string, newCategoryId: string, affectedIds: string[]) {
     affectedIds.forEach((id) => {
@@ -314,7 +354,7 @@ export function SourcesCardsView({
 
       {/* Filter / Sort toolbar */}
       <div className="px-6 py-3 border-b border-black/10 flex items-center gap-3 flex-wrap shrink-0">
-        {/* Category pills */}
+        {/* Org Type pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={onShowLibrary}
@@ -446,24 +486,48 @@ export function SourcesCardsView({
         {filteredSorted.length === 0 ? (
           <p className="text-center py-20 text-black/25 text-sm">No sources match the current filters.</p>
         ) : groupedView ? (
-          // Category-grouped layout (default name-sorted, no filters)
-          <div className="space-y-10">
-            {groupedView.groups.map((group) => (
-              <div key={group.catId}>
-                <h2 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/30 mb-4 pb-2 border-b border-black/8">
-                  {group.catName}
+          // Two-level grouped layout: Industry → Org Type → sources
+          <div className="space-y-12">
+            {groupedView.industryGroups.map((indGroup) => (
+              <div key={indGroup.indId}>
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/50 mb-5 pb-2 border-b border-black/10">
+                  {indGroup.indName}
                 </h2>
-                <SourceCardGrid sources={group.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                <div className="space-y-8">
+                  {indGroup.orgGroups.map((og) => (
+                    <div key={og.catId}>
+                      <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/30 mb-4 pb-1.5 border-b border-black/8">
+                        {og.catName}
+                      </h3>
+                      <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                    </div>
+                  ))}
+                  {indGroup.ungrouped.length > 0 && (
+                    <SourceCardGrid sources={indGroup.ungrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                  )}
+                </div>
               </div>
             ))}
-            {groupedView.uncategorized.length > 0 && (
+            {(groupedView.otherOrgGroups.length > 0 || groupedView.otherUngrouped.length > 0) && (
               <div>
-                {groupedView.groups.length > 0 && (
-                  <h2 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/20 mb-4 pb-2 border-b border-black/8">
-                    Uncategorized
+                {groupedView.industryGroups.length > 0 && (
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/25 mb-5 pb-2 border-b border-black/8">
+                    Other
                   </h2>
                 )}
-                <SourceCardGrid sources={groupedView.uncategorized} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                <div className="space-y-8">
+                  {groupedView.otherOrgGroups.map((og) => (
+                    <div key={og.catId}>
+                      <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/30 mb-4 pb-1.5 border-b border-black/8">
+                        {og.catName}
+                      </h3>
+                      <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                    </div>
+                  ))}
+                  {groupedView.otherUngrouped.length > 0 && (
+                    <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -477,9 +541,11 @@ export function SourcesCardsView({
         <SourcePanel
           source={selected}
           categories={categories}
+          industries={industries}
           allTags={allTags}
           sourceLists={sourceLists}
           onSetCategory={onSetCategory}
+          onSetIndustry={onSetIndustry}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
           onToggleSourceInList={onToggleSourceInList}
@@ -487,6 +553,7 @@ export function SourcesCardsView({
           onPromoteTag={(tag) => { setSelectedId(null); setPromotingTag(tag) }}
           onTagClick={(tag) => { setSelectedId(null); setTagPanel(tag) }}
           onCreateCategory={onCreateCategory}
+          onCreateIndustry={onCreateIndustry}
           onRenameSource={onRenameSource}
           onClose={() => setSelectedId(null)}
           allFeedPosts={allFeedPosts}

@@ -73,9 +73,10 @@ export function useSourceCategories() {
       if (prev.some((c) => c.id === id)) return prev
       const next = [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name))
       writeCache(next)
-      persist('/api/db/source-categories', 'POST', newCat)
       return next
     })
+    // persist outside the updater — updaters must be pure (no side effects)
+    persist('/api/db/source-categories', 'POST', newCat)
     return id
   }, [])
 

@@ -21,13 +21,14 @@ export async function GET() {
       isStatic: r.is_static ?? false,
       feedGroup: r.feed_group ?? undefined,
       categoryId: r.category_id ?? undefined,
+      industryId: r.industry_id ?? undefined,
       tags: r.tags ?? [],
     }))
   )
 }
 
 export async function POST(req: Request) {
-  const { id, name, url, feedUrl, color, type, apiPath, inFeed, addedAt, isStatic, feedGroup, categoryId, tags } = await req.json()
+  const { id, name, url, feedUrl, color, type, apiPath, inFeed, addedAt, isStatic, feedGroup, categoryId, industryId, tags } = await req.json()
   const { error } = await getSupabase()
     .from('user_sources')
     .insert({
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
       is_static: isStatic ?? false,
       feed_group: feedGroup ?? null,
       category_id: categoryId ?? null,
+      industry_id: industryId ?? null,
       tags: tags ?? [],
     })
   if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }

@@ -24,6 +24,7 @@ export interface LibrarySource {
   isStatic: boolean
   feedGroup?: string
   categoryId?: string
+  industryId?: string
   tags: string[]
 }
 
@@ -35,6 +36,11 @@ export type Source = Pick<LibrarySource, 'id' | 'name' | 'url' | 'type' | 'color
 export type UserSource = LibrarySource
 
 export interface SourceCategory {
+  id: string
+  name: string
+}
+
+export interface SourceIndustry {
   id: string
   name: string
 }

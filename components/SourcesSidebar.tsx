@@ -400,7 +400,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
               </div>
               <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
               <div className="space-y-1">
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Category</p>
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Org Type</p>
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
@@ -429,10 +429,10 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 <p className="text-[10px] text-black/40 truncate mt-0.5">{detect.feedUrl}</p>
               </div>
 
-              {/* Category selector */}
+              {/* Org Type selector */}
               <div className="space-y-1">
                 <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">
-                  Category
+                  Org Type
                   {detect.suggestedCategoryId && detect.confidence !== 'high' && (
                     <span className="ml-1 text-black/25 normal-case">· low confidence</span>
                   )}
@@ -482,7 +482,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 </button>
               </div>
               {detect.status === 'categorizing' && (
-                <p className="text-[10px] text-black/40">Suggesting category…</p>
+                <p className="text-[10px] text-black/40">Suggesting org type…</p>
               )}
               {detect.status === 'error' && (
                 <p className="text-[10px] text-red-500">{detect.message}</p>
