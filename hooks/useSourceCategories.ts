@@ -89,7 +89,7 @@ export function useSourceCategories() {
       return next
     })
     fetch(`/api/db/source-categories/${id}`, { method: 'DELETE' }).catch(() => {})
-  }, [updateCategories])
+  }, [])
 
   return { categories, createCategory, renameCategory, deleteCategory }
 }

@@ -14,7 +14,7 @@ export function useUserSources() {
   useEffect(() => {
     fetch('/api/db/user-sources')
       .then((r) => r.json())
-      .then((data: UserSource[]) => setSources(data))
+      .then((data: UserSource[]) => setSources(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 
