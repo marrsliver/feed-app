@@ -90,13 +90,15 @@ interface Props {
   onPromoteTag?: (tag: string) => void
   onTagClick?: (tag: string) => void
   onCreateCategory: (name: string) => string
+  onRenameSource?: (id: string, name: string) => void
   onClose: () => void
+  topLayer?: boolean
   allFeedPosts?: Post[]
   savedLists?: SavedList[]
   isRead?: (id: string) => boolean
 }
 
-export function SourcePanel({ source, categories, allTags, sourceLists, onSetCategory, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onClose, allFeedPosts, savedLists, isRead }: Props) {
+export function SourcePanel({ source, categories, allTags, sourceLists, onSetCategory, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onRenameSource, onClose, topLayer, allFeedPosts, savedLists, isRead }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
@@ -107,8 +109,17 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newListName, setNewListName] = useState('')
   const [addingList, setAddingList] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(source.name)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  function handleSaveRename() {
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== source.name) onRenameSource?.(source.id, trimmed)
+    setEditingName(false)
+  }
 
   function handleCreateCategory() {
     const name = newCategoryName.trim()
@@ -164,7 +175,7 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
   })()
 
   return (
-    <div className="fixed top-0 right-0 h-full w-full max-w-md z-[70] bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10 animate-slide-right">
+    <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10 animate-slide-right ${topLayer ? 'z-[95]' : 'z-[70]'}`}>
         {/* Color bar */}
         <div className="h-1 w-full shrink-0" style={{ backgroundColor: source.color }} />
 
@@ -182,9 +193,37 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
         <div className="flex-1 overflow-y-auto">
           <div className="px-5 py-5 space-y-4">
             {/* Name */}
-            <h2 className="font-display text-lg font-semibold text-black leading-snug">
-              {source.name}
-            </h2>
+            <div className="group/name flex items-start gap-2">
+              {editingName ? (
+                <input
+                  ref={nameInputRef}
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onBlur={handleSaveRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveRename()
+                    if (e.key === 'Escape') setEditingName(false)
+                  }}
+                  autoFocus
+                  className="flex-1 font-display text-lg font-semibold text-black leading-snug border-b border-black/30 outline-none bg-transparent pb-0.5"
+                />
+              ) : (
+                <>
+                  <h2 className="font-display text-lg font-semibold text-black leading-snug flex-1">
+                    {source.name}
+                  </h2>
+                  {onRenameSource && (
+                    <button
+                      onClick={() => { setNameValue(source.name); setEditingName(true) }}
+                      className="opacity-0 group-hover/name:opacity-100 shrink-0 p-0.5 text-black/20 hover:text-black transition-all mt-1"
+                      aria-label="Rename source"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* Category selector */}
             <div className="space-y-1">

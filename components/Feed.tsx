@@ -99,6 +99,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
   const [sidebarSelectedSource, setSidebarSelectedSource] = useState<LibrarySource | null>(null)
+  const [sourceOpenedFromPost, setSourceOpenedFromPost] = useState(false)
   const [sidebarTagPanel, setSidebarTagPanel] = useState<string | null>(null)
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [isRandomized, setIsRandomized] = useState(false)
@@ -122,6 +123,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     loaded: sourcesLoaded,
     addSource,
     removeSource,
+    renameSource,
     toggleFeed,
     setCategory,
     addTag,
@@ -428,6 +430,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           categories={categories}
           onAddSource={addSource}
           onRemoveSource={removeSource}
+          onRenameSource={renameSource}
           onToggleFeed={toggleFeed}
           onOpenSource={(id) => {
             const source = [...staticSources, ...userSources].find((s) => s.id === id)
@@ -454,6 +457,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onCreateSourceList={createSourceList}
           onCreateCategory={createCategory}
           onToggleFeed={toggleFeed}
+          onRenameSource={renameSource}
           onShowLibrary={() => { setSourcesOpen(true) }}
           onClose={() => setSourcesCardsOpen(false)}
           allFeedPosts={allPosts}
@@ -496,7 +500,9 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onPromoteTag={(tag) => { setSidebarSelectedSource(null); /* promotion not supported from sidebar context */ }}
           onTagClick={(tag) => { setSidebarSelectedSource(null); setSidebarTagPanel(tag) }}
           onCreateCategory={createCategory}
-          onClose={() => setSidebarSelectedSource(null)}
+          onRenameSource={renameSource}
+          onClose={() => { setSidebarSelectedSource(null); setSourceOpenedFromPost(false) }}
+          topLayer={sourceOpenedFromPost}
           allFeedPosts={allPosts}
           savedLists={lists}
           isRead={isRead}
@@ -578,6 +584,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
               onDelete={() => {
                 archivePost(post, feedId, post.sourceId === 'manual')
                 if (post.sourceId === 'manual') removePost(post.id)
+              }}
+              onOpenSource={(sourceId) => {
+                const source = [...staticSources, ...userSources].find((s) => s.id === sourceId)
+                if (source) { setSidebarSelectedSource(source); setSourceOpenedFromPost(true) }
               }}
             />
           ))}

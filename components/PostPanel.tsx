@@ -13,6 +13,7 @@ interface Props {
   onRead?: () => void
   onMove?: () => void
   onDelete?: () => void
+  onOpenSource?: (sourceId: string) => void
   onClose: () => void
 }
 
@@ -108,7 +109,7 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onRead, onMove, onDelete, onClose }: Props) {
+export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onClose }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const isManual = post.sourceId === 'manual'
   const otherFeedLabel = feedId === 'research' ? 'Music Feed' : 'Research Feed'
@@ -152,12 +153,22 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onClose }: P
       <div className="fixed top-0 right-0 h-full w-full max-w-md z-[90] bg-white flex flex-col overflow-hidden animate-slide-right">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
-          <span
-            className="text-[9px] font-semibold uppercase tracking-[0.15em]"
-            style={{ color: post.sourceColor }}
-          >
-            {post.sourceName}
-          </span>
+          {onOpenSource && !isManual ? (
+            <button
+              onClick={() => onOpenSource(post.sourceId)}
+              className="text-[9px] font-semibold uppercase tracking-[0.15em] hover:opacity-60 transition-opacity"
+              style={{ color: post.sourceColor }}
+            >
+              {post.sourceName}
+            </button>
+          ) : (
+            <span
+              className="text-[9px] font-semibold uppercase tracking-[0.15em]"
+              style={{ color: post.sourceColor }}
+            >
+              {post.sourceName}
+            </span>
+          )}
           <div className="flex items-center gap-2">
             <BookmarkButton post={post} />
             <button

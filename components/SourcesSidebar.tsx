@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink } from 'lucide-react'
+import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink, Pencil } from 'lucide-react'
 import type { LibrarySource, SourceCategory } from '@/lib/types'
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   categories: SourceCategory[]
   onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => void
   onRemoveSource: (id: string) => void
+  onRenameSource?: (id: string, name: string) => void
   onToggleFeed: (id: string) => void
   onOpenSource?: (id: string) => void
   onClose: () => void
@@ -38,41 +39,74 @@ function SourceRow({
   s,
   onToggleFeed,
   onRemoveSource,
+  onRenameSource,
   onOpenSource,
   showKind,
 }: {
   s: DisplaySource
   onToggleFeed: (id: string) => void
   onRemoveSource: (id: string) => void
+  onRenameSource?: (id: string, name: string) => void
   onOpenSource?: (id: string) => void
   showKind: boolean
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(s.name)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  function handleStartRename() {
+    setNameValue(s.name)
+    setEditingName(true)
+    setTimeout(() => nameInputRef.current?.focus(), 10)
+  }
+
+  function handleSaveRename() {
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== s.name) onRenameSource?.(s.id, trimmed)
+    setEditingName(false)
+  }
 
   return (
     <div
       className="flex items-center gap-2.5 py-1.5 group"
-      onMouseLeave={() => setConfirmDelete(false)}
+      onMouseLeave={() => { setConfirmDelete(false) }}
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => onOpenSource?.(s.id)}
-            className="text-sm text-black/70 hover:text-black transition-colors truncate text-left flex-1"
-          >
-            {s.name}
-          </button>
-          <a
-            href={s.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0 p-0.5 text-black/15 hover:text-black/50 transition-colors opacity-0 group-hover:opacity-100"
-            title="Visit source"
-          >
-            <ExternalLink size={10} />
-          </a>
+          {editingName ? (
+            <input
+              ref={nameInputRef}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={handleSaveRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveRename()
+                if (e.key === 'Escape') setEditingName(false)
+              }}
+              className="flex-1 text-sm text-black border-b border-black/30 outline-none bg-transparent py-0.5 min-w-0"
+            />
+          ) : (
+            <button
+              onClick={() => onOpenSource?.(s.id)}
+              className="text-sm text-black/70 hover:text-black transition-colors truncate text-left flex-1"
+            >
+              {s.name}
+            </button>
+          )}
+          {!editingName && (
+            <a
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 p-0.5 text-black/15 hover:text-black/50 transition-colors opacity-0 group-hover:opacity-100"
+              title="Visit source"
+            >
+              <ExternalLink size={10} />
+            </a>
+          )}
         </div>
         {showKind && (
           <span className="text-[9px] text-black/25 uppercase tracking-widest">
@@ -80,8 +114,15 @@ function SourceRow({
           </span>
         )}
       </div>
-      {s.kind === 'user' && (
+      {s.kind === 'user' && !editingName && (
         <>
+          <button
+            onClick={handleStartRename}
+            className="opacity-0 group-hover:opacity-100 shrink-0 p-1 text-black/20 hover:text-black transition-all"
+            aria-label="Rename source"
+          >
+            <Pencil size={10} />
+          </button>
           <button
             onClick={() => onToggleFeed(s.id)}
             title={s.inFeed ? 'In feed — click to move to list only' : 'List only — click to add to feed'}
@@ -120,7 +161,7 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, onAddSource, onRemoveSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
+export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
   const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
@@ -308,7 +349,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                     </p>
                     <div className="space-y-0.5">
                       {group.items.map((s) => (
-                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onOpenSource={onOpenSource} showKind={false} />
+                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
                       ))}
                     </div>
                   </div>
@@ -322,7 +363,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                     )}
                     <div className="space-y-0.5">
                       {uncategorized.map((s) => (
-                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onOpenSource={onOpenSource} showKind={false} />
+                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
                       ))}
                     </div>
                   </div>
@@ -339,7 +380,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
               ) : (
                 <div className="space-y-0.5">
                   {displayList.map((s) => (
-                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onOpenSource={onOpenSource} showKind={tab === 'feed'} />
+                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={tab === 'feed'} />
                   ))}
                 </div>
               )

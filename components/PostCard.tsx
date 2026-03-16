@@ -13,6 +13,7 @@ interface Props {
   onRead?: () => void
   onMove?: () => void
   onDelete?: () => void
+  onOpenSource?: (sourceId: string) => void
 }
 
 function formatDate(dateStr: string): string {
@@ -27,7 +28,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Props) {
+export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
@@ -91,7 +92,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Pro
         </div>
       </div>
 
-      {panelOpen && <PostPanel post={post} feedId={feedId} onRead={onRead} onMove={onMove} onDelete={onDelete} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <PostPanel post={post} feedId={feedId} onRead={onRead} onMove={onMove} onDelete={onDelete} onOpenSource={onOpenSource} onClose={() => setPanelOpen(false)} />}
     </>
   )
 }

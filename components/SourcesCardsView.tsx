@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, Tag, List } from 'lucide-react'
+import { useState, useRef, useMemo } from 'react'
+import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, Tag, List, Pencil } from 'lucide-react'
 import Masonry from 'react-masonry-css'
 import type { LibrarySource, SourceCategory, SourceList, Post, SavedList } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
@@ -21,6 +21,7 @@ interface Props {
   onCreateSourceList: (name: string) => string
   onCreateCategory: (name: string) => string
   onToggleFeed: (id: string) => void
+  onRenameSource?: (id: string, name: string) => void
   onShowLibrary: () => void
   onClose: () => void
   allFeedPosts?: Post[]
@@ -29,6 +30,185 @@ interface Props {
 }
 
 type SortMode = 'name' | 'newest' | 'oldest'
+
+function SourceCard({
+  s,
+  categories,
+  noteCount,
+  onSelect,
+  setTagPanel,
+  onRemoveTag,
+  onToggleFeed,
+  onRenameSource,
+}: {
+  s: LibrarySource
+  categories: SourceCategory[]
+  noteCount: number
+  onSelect: () => void
+  setTagPanel: (tag: string) => void
+  onRemoveTag: (id: string, tag: string) => void
+  onToggleFeed: (id: string) => void
+  onRenameSource?: (id: string, name: string) => void
+}) {
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(s.name)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const category = categories.find((c) => c.id === s.categoryId)
+
+  function handleStartRename(e: React.MouseEvent) {
+    e.stopPropagation()
+    setNameValue(s.name)
+    setEditingName(true)
+    setTimeout(() => nameInputRef.current?.focus(), 10)
+  }
+
+  function handleSaveRename() {
+    const trimmed = nameValue.trim()
+    if (trimmed && trimmed !== s.name) onRenameSource?.(s.id, trimmed)
+    setEditingName(false)
+  }
+
+  return (
+    <div
+      className="bg-white overflow-hidden transition-all duration-300 cursor-pointer group/card"
+      style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
+      onClick={onSelect}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.1)' }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 0 1px rgba(0,0,0,0.07)' }}
+    >
+      <div className="h-1.5 w-full" style={{ backgroundColor: s.color }} />
+      <div className="p-4 space-y-3">
+        {/* Name with inline edit */}
+        <div className="flex items-start gap-1.5">
+          {editingName ? (
+            <input
+              ref={nameInputRef}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={handleSaveRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveRename()
+                if (e.key === 'Escape') setEditingName(false)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 font-display text-sm font-semibold text-black leading-snug border-b border-black/30 outline-none bg-transparent pb-0.5 min-w-0"
+            />
+          ) : (
+            <>
+              <h2 className="font-display text-sm font-semibold text-black leading-snug flex-1">{s.name}</h2>
+              {onRenameSource && (
+                <button
+                  onClick={handleStartRename}
+                  className="opacity-0 group-hover/card:opacity-100 shrink-0 p-0.5 text-black/20 hover:text-black transition-all mt-0.5"
+                  aria-label="Rename source"
+                >
+                  <Pencil size={10} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <a
+          href={s.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1 text-[10px] text-black/35 hover:text-black transition-colors truncate"
+        >
+          <ExternalLink size={9} className="shrink-0" />
+          {s.url.replace(/^https?:\/\/(www\.)?/, '')}
+        </a>
+        {category && (
+          <span className="inline-block text-[9px] font-semibold uppercase tracking-[0.12em] text-black/50 border border-black/20 px-1.5 py-0.5">
+            {category.name}
+          </span>
+        )}
+        {s.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            {s.tags.map((tag) => (
+              <span key={tag} className="inline-flex items-center gap-0.5 text-[9px] text-black/40 border border-black/10 px-1.5 py-0.5">
+                <button onClick={() => setTagPanel(tag)} className="hover:text-black transition-colors leading-none" title={`See all sources tagged "${tag}"`}>
+                  {tag}
+                </button>
+                <button onClick={() => onRemoveTag(s.id, tag)} className="text-black/25 hover:text-black/60 transition-colors leading-none ml-0.5" aria-label={`Remove tag ${tag}`}>
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-between pt-0.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 border border-black/10 px-1.5 py-0.5">
+              {s.isStatic ? 'Built-in' : 'User added'}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleFeed(s.id) }}
+              className={`flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border transition-colors ${
+                s.inFeed
+                  ? 'border-black/20 text-black/50 hover:border-black/40 hover:text-black'
+                  : 'border-black/10 text-black/25 hover:border-black/20 hover:text-black/40'
+              }`}
+              title={s.inFeed ? 'Move to list only' : 'Add to feed'}
+            >
+              {s.inFeed ? <Rss size={8} /> : <BookOpen size={8} />}
+              {s.inFeed ? 'In feed' : 'List only'}
+            </button>
+          </div>
+          {noteCount > 0 && (
+            <span className="flex items-center gap-1 text-[9px] text-black/30">
+              <MessageSquare size={9} />
+              {noteCount}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SourceCardGrid({
+  sources,
+  categories,
+  getComments,
+  setSelectedId,
+  setTagPanel,
+  onRemoveTag,
+  onToggleFeed,
+  onRenameSource,
+}: {
+  sources: LibrarySource[]
+  categories: SourceCategory[]
+  getComments: (id: string) => unknown[]
+  setSelectedId: (id: string) => void
+  setTagPanel: (tag: string) => void
+  onRemoveTag: (id: string, tag: string) => void
+  onToggleFeed: (id: string) => void
+  onRenameSource?: (id: string, name: string) => void
+}) {
+  return (
+    <Masonry
+      breakpointCols={BREAKPOINTS}
+      className="flex -ml-4 w-auto"
+      columnClassName="pl-4 bg-clip-padding"
+    >
+      {sources.map((s) => (
+        <div key={s.id} className="break-inside-avoid mb-4">
+          <SourceCard
+            s={s}
+            categories={categories}
+            noteCount={getComments(s.id).length}
+            onSelect={() => setSelectedId(s.id)}
+            setTagPanel={setTagPanel}
+            onRemoveTag={onRemoveTag}
+            onToggleFeed={onToggleFeed}
+            onRenameSource={onRenameSource}
+          />
+        </div>
+      ))}
+    </Masonry>
+  )
+}
 
 const BREAKPOINTS = {
   default: 4,
@@ -50,6 +230,7 @@ export function SourcesCardsView({
   onCreateSourceList,
   onCreateCategory,
   onToggleFeed,
+  onRenameSource,
   onShowLibrary,
   onClose,
   allFeedPosts,
@@ -87,6 +268,26 @@ export function SourcesCardsView({
     else if (sort === 'oldest') list.sort((a, b) => a.addedAt - b.addedAt)
     return list
   }, [sources, filterCategory, filterTag, filterList, sort, sourceLists])
+
+  // Group by category alphabetically when in name-sort mode with no active filters
+  const groupedView = useMemo(() => {
+    if (sort !== 'name' || filterCategory || filterTag || filterList) return null
+    const catMap = new Map<string, { catId: string; catName: string; sources: LibrarySource[] }>()
+    const uncategorized: LibrarySource[] = []
+    for (const s of filteredSorted) {
+      if (s.categoryId) {
+        if (!catMap.has(s.categoryId)) {
+          const cat = categories.find((c) => c.id === s.categoryId)
+          catMap.set(s.categoryId, { catId: s.categoryId, catName: cat?.name ?? s.categoryId, sources: [] })
+        }
+        catMap.get(s.categoryId)!.sources.push(s)
+      } else {
+        uncategorized.push(s)
+      }
+    }
+    const groups = Array.from(catMap.values()).sort((a, b) => a.catName.localeCompare(b.catName))
+    return { groups, uncategorized }
+  }, [filteredSorted, categories, sort, filterCategory, filterTag, filterList])
 
   function handlePromoteTag(tag: string, newCategoryId: string, affectedIds: string[]) {
     affectedIds.forEach((id) => {
@@ -242,117 +443,33 @@ export function SourcesCardsView({
         className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6"
         onClick={() => { setTagDropdownOpen(false); setListDropdownOpen(false) }}
       >
-        <Masonry
-          breakpointCols={BREAKPOINTS}
-          className="flex -ml-4 w-auto"
-          columnClassName="pl-4 bg-clip-padding"
-        >
-          {filteredSorted.map((s) => {
-            const noteCount = getComments(s.id).length
-            const category = categories.find((c) => c.id === s.categoryId)
-            return (
-              <div key={s.id} className="break-inside-avoid mb-4">
-                <div
-                  className="bg-white overflow-hidden transition-all duration-300 cursor-pointer"
-                  style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
-                  onClick={() => setSelectedId(s.id)}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.1)'
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 0 1px rgba(0,0,0,0.07)'
-                  }}
-                >
-                  {/* Color bar */}
-                  <div className="h-1.5 w-full" style={{ backgroundColor: s.color }} />
-
-                  <div className="p-4 space-y-3">
-                    {/* Name */}
-                    <h2 className="font-display text-sm font-semibold text-black leading-snug">
-                      {s.name}
-                    </h2>
-
-                    {/* URL */}
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-[10px] text-black/35 hover:text-black transition-colors truncate"
-                    >
-                      <ExternalLink size={9} className="shrink-0" />
-                      {s.url.replace(/^https?:\/\/(www\.)?/, '')}
-                    </a>
-
-                    {/* Category badge */}
-                    {category && (
-                      <span className="inline-block text-[9px] font-semibold uppercase tracking-[0.12em] text-black/50 border border-black/20 px-1.5 py-0.5">
-                        {category.name}
-                      </span>
-                    )}
-
-                    {/* Tags row */}
-                    {s.tags.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                        {s.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="inline-flex items-center gap-0.5 text-[9px] text-black/40 border border-black/10 px-1.5 py-0.5"
-                          >
-                            <button
-                              onClick={() => setTagPanel(tag)}
-                              className="hover:text-black transition-colors leading-none"
-                              title={`See all sources tagged "${tag}"`}
-                            >
-                              {tag}
-                            </button>
-                            <button
-                              onClick={() => onRemoveTag(s.id, tag)}
-                              className="text-black/25 hover:text-black/60 transition-colors leading-none ml-0.5"
-                              aria-label={`Remove tag ${tag}`}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Status + note count */}
-                    <div className="flex items-center justify-between pt-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 border border-black/10 px-1.5 py-0.5">
-                          {s.isStatic ? 'Built-in' : 'User added'}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onToggleFeed(s.id) }}
-                          className={`flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border transition-colors ${
-                            s.inFeed
-                              ? 'border-black/20 text-black/50 hover:border-black/40 hover:text-black'
-                              : 'border-black/10 text-black/25 hover:border-black/20 hover:text-black/40'
-                          }`}
-                          title={s.inFeed ? 'Move to list only' : 'Add to feed'}
-                        >
-                          {s.inFeed ? <Rss size={8} /> : <BookOpen size={8} />}
-                          {s.inFeed ? 'In feed' : 'List only'}
-                        </button>
-                      </div>
-                      {noteCount > 0 && (
-                        <span className="flex items-center gap-1 text-[9px] text-black/30">
-                          <MessageSquare size={9} />
-                          {noteCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </Masonry>
-
-        {filteredSorted.length === 0 && (
+        {filteredSorted.length === 0 ? (
           <p className="text-center py-20 text-black/25 text-sm">No sources match the current filters.</p>
+        ) : groupedView ? (
+          // Category-grouped layout (default name-sorted, no filters)
+          <div className="space-y-10">
+            {groupedView.groups.map((group) => (
+              <div key={group.catId}>
+                <h2 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/30 mb-4 pb-2 border-b border-black/8">
+                  {group.catName}
+                </h2>
+                <SourceCardGrid sources={group.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+              </div>
+            ))}
+            {groupedView.uncategorized.length > 0 && (
+              <div>
+                {groupedView.groups.length > 0 && (
+                  <h2 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/20 mb-4 pb-2 border-b border-black/8">
+                    Uncategorized
+                  </h2>
+                )}
+                <SourceCardGrid sources={groupedView.uncategorized} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+              </div>
+            )}
+          </div>
+        ) : (
+          // Flat layout (filtered or date-sorted)
+          <SourceCardGrid sources={filteredSorted} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
         )}
       </div>
 
@@ -370,6 +487,7 @@ export function SourcesCardsView({
           onPromoteTag={(tag) => { setSelectedId(null); setPromotingTag(tag) }}
           onTagClick={(tag) => { setSelectedId(null); setTagPanel(tag) }}
           onCreateCategory={onCreateCategory}
+          onRenameSource={onRenameSource}
           onClose={() => setSelectedId(null)}
           allFeedPosts={allFeedPosts}
           savedLists={savedLists}

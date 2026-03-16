@@ -141,6 +141,11 @@ export function useLibrarySources() {
     persist(`/api/db/user-sources/${id}`, 'DELETE')
   }, [updateSources])
 
+  const renameSource = useCallback((id: string, name: string) => {
+    updateSources((prev) => prev.map((s) => s.id === id ? { ...s, name } : s))
+    persist(`/api/db/user-sources/${id}`, 'PATCH', { name })
+  }, [updateSources])
+
   const toggleFeed = useCallback((id: string) => {
     updateSources((prev) => {
       const next = prev.map((s) => (s.id === id ? { ...s, inFeed: !s.inFeed } : s))
@@ -187,6 +192,7 @@ export function useLibrarySources() {
     loaded,
     addSource,
     removeSource,
+    renameSource,
     toggleFeed,
     setCategory,
     addTag,
