@@ -35,17 +35,26 @@ export function AddLinkPanel({ feedId, onAdd, onClose }: Props) {
     try {
       const res = await fetch(`/api/og?url=${encodeURIComponent(trimmed)}`)
       const data: OGData = await res.json()
-      setOG(data)
-      setTitle(data.title ?? '')
+      if (data.error) {
+        // Fetch failed — fall back to manual entry with hostname as suggested title
+        const hostname = (() => { try { return new URL(trimmed).hostname.replace(/^www\./, '') } catch { return '' } })()
+        setOG({ error: 'manual' })
+        setTitle(hostname)
+      } else {
+        setOG(data)
+        setTitle(data.title ?? '')
+      }
     } catch {
-      setOG({ error: 'Could not fetch that URL. Try another.' })
+      const hostname = (() => { try { return new URL(url.trim()).hostname.replace(/^www\./, '') } catch { return '' } })()
+      setOG({ error: 'manual' })
+      setTitle(hostname)
     } finally {
       setLoading(false)
     }
   }
 
   function handleAdd() {
-    if (!og || og.error || !title.trim()) return
+    if (!og || !title.trim()) return
 
     const hostname = (() => {
       try { return new URL(url.trim()).hostname.replace(/^www\./, '') }
@@ -56,11 +65,11 @@ export function AddLinkPanel({ feedId, onAdd, onClose }: Props) {
       id: `manual-${feedId}-${Date.now()}`,
       title: title.trim(),
       url: url.trim(),
-      image: og.image,
-      excerpt: og.description?.slice(0, 200),
+      image: og.error ? undefined : og.image,
+      excerpt: og.error ? undefined : og.description?.slice(0, 200),
       date: new Date().toISOString(),
       sourceId: 'manual',
-      sourceName: og.siteName ?? hostname,
+      sourceName: og.error ? hostname : (og.siteName ?? hostname),
       sourceColor: '#71717a',
     }
 
@@ -157,8 +166,29 @@ export function AddLinkPanel({ feedId, onAdd, onClose }: Props) {
             </div>
           )}
 
-          {og?.error && (
-            <p className="text-sm text-black/40">{og.error}</p>
+          {og?.error === 'manual' && (
+            <div className="space-y-4">
+              <p className="text-xs text-black/40 leading-relaxed">
+                Couldn&apos;t load a preview for this page — enter a title to save the link manually.
+              </p>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-widest text-black/30">Title</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  autoFocus
+                  className="w-full text-sm font-display font-semibold border border-black/15 px-3 py-2 outline-none focus:border-black/40 transition-colors"
+                />
+              </div>
+              <button
+                onClick={handleAdd}
+                disabled={!title.trim()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-black text-white text-sm font-medium hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Plus size={14} />
+                Add to feed
+              </button>
+            </div>
           )}
         </div>
       </div>
