@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { SavedList, Post } from '@/lib/types'
+import { queueWrite, clearWrite } from '@/lib/pendingWrites'
+import { notifyPendingWritesChanged } from './usePendingWrites'
 
 const LS_KEY = 'saved_lists_cache_v1'
 
@@ -15,6 +17,18 @@ function readCache(): SavedList[] | null {
 
 function writeCache(lists: SavedList[]) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(lists)) } catch { /* ignore */ }
+}
+
+function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+  const writeId = queueWrite(url, method, body)
+  notifyPendingWritesChanged()
+  fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
+    .catch(() => { /* stays in queue until replayed */ })
 }
 
 export function useSavedLists() {
@@ -55,26 +69,18 @@ export function useSavedLists() {
     const id = Date.now().toString()
     const newList: SavedList = { id, name: name.trim(), postIds: [], postData: {}, createdAt: Date.now() }
     updateLists((prev) => [...prev, newList])
-    fetch('/api/db/lists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newList),
-    }).catch(() => {})
+    persist('/api/db/lists', 'POST', newList)
     return id
   }, [updateLists])
 
   const deleteList = useCallback((id: string) => {
     updateLists((prev) => prev.filter((l) => l.id !== id))
-    fetch(`/api/db/lists/${id}`, { method: 'DELETE' }).catch(() => {})
+    persist(`/api/db/lists/${id}`, 'DELETE')
   }, [updateLists])
 
   const renameList = useCallback((id: string, name: string) => {
     updateLists((prev) => prev.map((l) => (l.id === id ? { ...l, name: name.trim() } : l)))
-    fetch(`/api/db/lists/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }),
-    }).catch(() => {})
+    persist(`/api/db/lists/${id}`, 'PATCH', { name: name.trim() })
   }, [updateLists])
 
   const togglePostInList = useCallback((listId: string, postId: string, post?: Post) => {
@@ -84,11 +90,7 @@ export function useSavedLists() {
       const postIds = has ? l.postIds.filter((id) => id !== postId) : [...l.postIds, postId]
       const postData = { ...(l.postData ?? {}) }
       if (has) { delete postData[postId] } else if (post) { postData[postId] = post }
-      fetch(`/api/db/lists/${listId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postIds, postData }),
-      }).catch(() => {})
+      persist(`/api/db/lists/${listId}`, 'PATCH', { postIds, postData })
       return { ...l, postIds, postData }
     }))
   }, [updateLists])

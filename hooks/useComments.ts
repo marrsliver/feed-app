@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Comment } from '@/lib/types'
+import { queueWrite, clearWrite } from '@/lib/pendingWrites'
+import { notifyPendingWritesChanged } from './usePendingWrites'
+
+function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+  const writeId = queueWrite(url, method, body)
+  notifyPendingWritesChanged()
+  fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
+    .catch(() => { /* stays in queue until replayed */ })
+}
 
 const LS_KEY = 'comments_cache_v1'
 
@@ -66,11 +80,7 @@ export function useComments() {
       createdAt: Date.now(),
     }
     updateData((prev) => ({ ...prev, [entityId]: [...(prev[entityId] ?? []), comment] }))
-    fetch('/api/db/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: comment.id, entityId, text: comment.text, createdAt: comment.createdAt }),
-    }).catch(() => {})
+    persist('/api/db/comments', 'POST', { id: comment.id, entityId, text: comment.text, createdAt: comment.createdAt })
   }, [updateData])
 
   const deleteComment = useCallback((entityId: string, commentId: string) => {
@@ -78,7 +88,7 @@ export function useComments() {
       ...prev,
       [entityId]: (prev[entityId] ?? []).filter((c) => c.id !== commentId),
     }))
-    fetch(`/api/db/comments/${commentId}`, { method: 'DELETE' }).catch(() => {})
+    persist(`/api/db/comments/${commentId}`, 'DELETE')
   }, [updateData])
 
   const editComment = useCallback((entityId: string, commentId: string, text: string) => {
@@ -88,11 +98,7 @@ export function useComments() {
         c.id === commentId ? { ...c, text: text.trim() } : c
       ),
     }))
-    fetch(`/api/db/comments/${commentId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.trim() }),
-    }).catch(() => {})
+    persist(`/api/db/comments/${commentId}`, 'PATCH', { text: text.trim() })
   }, [updateData])
 
   const getComments = useCallback(

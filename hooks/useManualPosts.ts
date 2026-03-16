@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Post } from '@/lib/types'
+import { queueWrite, clearWrite } from '@/lib/pendingWrites'
+import { notifyPendingWritesChanged } from './usePendingWrites'
+
+function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+  const writeId = queueWrite(url, method, body)
+  notifyPendingWritesChanged()
+  fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
+    .catch(() => { /* stays in queue until replayed */ })
+}
 
 type ManualRecord = { feedId: string; post: Post; addedAt: number }
 
@@ -61,25 +75,17 @@ export function useManualPosts(feedId: string) {
   const addPost = useCallback((post: Post) => {
     const addedAt = Date.now()
     updatePosts((prev) => [{ feedId, post, addedAt }, ...prev])
-    fetch('/api/db/manual-posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedId, post, addedAt }),
-    }).catch(() => {})
+    persist('/api/db/manual-posts', 'POST', { feedId, post, addedAt })
   }, [feedId, updatePosts])
 
   const removePost = useCallback((postId: string) => {
     updatePosts((prev) => prev.filter((r) => r.post.id !== postId))
-    fetch(`/api/db/manual-posts/${postId}`, { method: 'DELETE' }).catch(() => {})
+    persist(`/api/db/manual-posts/${postId}`, 'DELETE')
   }, [updatePosts])
 
   const movePost = useCallback((postId: string, toFeedId: string) => {
     updatePosts((prev) => prev.map((r) => r.post.id === postId ? { ...r, feedId: toFeedId } : r))
-    fetch(`/api/db/manual-posts/${postId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedId: toFeedId }),
-    }).catch(() => {})
+    persist(`/api/db/manual-posts/${postId}`, 'PATCH', { feedId: toFeedId })
   }, [updatePosts])
 
   return { posts, addPost, removePost, movePost }

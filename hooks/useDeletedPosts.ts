@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Post } from '@/lib/types'
+import { queueWrite, clearWrite } from '@/lib/pendingWrites'
+import { notifyPendingWritesChanged } from './usePendingWrites'
+
+function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+  const writeId = queueWrite(url, method, body)
+  notifyPendingWritesChanged()
+  fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
+    .catch(() => { /* stays in queue until replayed */ })
+}
 
 export interface DeletedRecord {
   post: Post
@@ -61,11 +75,7 @@ export function useDeletedPosts() {
       if (prev.some((r) => r.post.id === post.id)) return prev
       return [{ post, feedId, wasManual, deletedAt }, ...prev]
     })
-    fetch('/api/db/deleted-posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ post, feedId, wasManual, deletedAt }),
-    }).catch(() => {})
+    persist('/api/db/deleted-posts', 'POST', { post, feedId, wasManual, deletedAt })
   }, [updateRecords])
 
   const restorePost = useCallback((postId: string) => {
@@ -73,15 +83,10 @@ export function useDeletedPosts() {
       const record = prev.find((r) => r.post.id === postId)
       if (!record) return prev
       if (record.wasManual) {
-        fetch('/api/db/manual-posts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feedId: record.feedId, post: record.post, addedAt: Date.now() }),
-        })
-          .then(() => window.dispatchEvent(new CustomEvent('manual-posts-updated')))
-          .catch(() => {})
+        persist('/api/db/manual-posts', 'POST', { feedId: record.feedId, post: record.post, addedAt: Date.now() })
+        window.dispatchEvent(new CustomEvent('manual-posts-updated'))
       }
-      fetch(`/api/db/deleted-posts/${postId}`, { method: 'DELETE' }).catch(() => {})
+      persist(`/api/db/deleted-posts/${postId}`, 'DELETE')
       return prev.filter((r) => r.post.id !== postId)
     })
   }, [updateRecords])

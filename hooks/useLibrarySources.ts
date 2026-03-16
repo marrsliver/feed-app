@@ -3,6 +3,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { LibrarySource } from '@/lib/types'
 import { researchSources, musicSources } from '@/lib/sources.config'
+import { queueWrite, clearWrite } from '@/lib/pendingWrites'
+import { notifyPendingWritesChanged } from './usePendingWrites'
+
+function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+  const writeId = queueWrite(url, method, body)
+  notifyPendingWritesChanged()
+  fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
+    .catch(() => { /* stays in queue until replayed */ })
+}
 
 const COLORS = [
   '#6366f1', '#10b981', '#f59e0b', '#ef4444',
@@ -117,18 +131,14 @@ export function useLibrarySources() {
       const color = COLORS[userCount % COLORS.length]
       const addedAt = Date.now()
       const next: LibrarySource = { ...source, color, addedAt, isStatic: false, tags: [] }
-      fetch('/api/db/user-sources', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
-      }).catch(() => {})
+      persist('/api/db/user-sources', 'POST', next)
       return [...prev, next]
     })
   }, [updateSources])
 
   const removeSource = useCallback((id: string) => {
     updateSources((prev) => prev.filter((s) => s.id !== id))
-    fetch(`/api/db/user-sources/${id}`, { method: 'DELETE' }).catch(() => {})
+    persist(`/api/db/user-sources/${id}`, 'DELETE')
   }, [updateSources])
 
   const toggleFeed = useCallback((id: string) => {
@@ -136,11 +146,7 @@ export function useLibrarySources() {
       const next = prev.map((s) => (s.id === id ? { ...s, inFeed: !s.inFeed } : s))
       const updated = next.find((s) => s.id === id)
       if (updated) {
-        fetch(`/api/db/user-sources/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inFeed: updated.inFeed }),
-        }).catch(() => {})
+        persist(`/api/db/user-sources/${id}`, 'PATCH', { inFeed: updated.inFeed })
       }
       return next
     })
@@ -148,11 +154,7 @@ export function useLibrarySources() {
 
   const setCategory = useCallback((id: string, categoryId: string | null) => {
     updateSources((prev) => prev.map((s) => (s.id === id ? { ...s, categoryId: categoryId ?? undefined } : s)))
-    fetch(`/api/db/user-sources/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categoryId }),
-    }).catch(() => {})
+    persist(`/api/db/user-sources/${id}`, 'PATCH', { categoryId })
   }, [updateSources])
 
   const addTag = useCallback((id: string, tag: string) => {
@@ -160,11 +162,7 @@ export function useLibrarySources() {
       return prev.map((s) => {
         if (s.id !== id || s.tags.includes(tag)) return s
         const tags = [...s.tags, tag]
-        fetch(`/api/db/user-sources/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tags }),
-        }).catch(() => {})
+        persist(`/api/db/user-sources/${id}`, 'PATCH', { tags })
         return { ...s, tags }
       })
     })
@@ -175,11 +173,7 @@ export function useLibrarySources() {
       return prev.map((s) => {
         if (s.id !== id) return s
         const tags = s.tags.filter((t) => t !== tag)
-        fetch(`/api/db/user-sources/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tags }),
-        }).catch(() => {})
+        persist(`/api/db/user-sources/${id}`, 'PATCH', { tags })
         return { ...s, tags }
       })
     })

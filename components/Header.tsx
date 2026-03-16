@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePendingWrites } from '@/hooks/usePendingWrites'
 
 interface Props {
   activeFeed: 'research' | 'remix'
@@ -9,6 +10,8 @@ interface Props {
 }
 
 export function Header({ activeFeed, sourcesCount, onShowSources }: Props) {
+  const { pendingCount, retrying, retry } = usePendingWrites()
+
   return (
     <header className="border-b border-black/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-end justify-between">
@@ -51,11 +54,24 @@ export function Header({ activeFeed, sourcesCount, onShowSources }: Props) {
           </Link>
         </div>
 
-        {sourcesCount !== undefined && (
-          <span className="text-xs text-black/30 font-light tracking-widest uppercase">
-            {sourcesCount} source{sourcesCount !== 1 ? 's' : ''}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {pendingCount > 0 && (
+            <button
+              onClick={retry}
+              disabled={retrying}
+              title={`${pendingCount} unsaved change${pendingCount !== 1 ? 's' : ''} — click to retry`}
+              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50 transition-colors"
+            >
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              {retrying ? 'Saving…' : `${pendingCount} unsaved`}
+            </button>
+          )}
+          {sourcesCount !== undefined && (
+            <span className="text-xs text-black/30 font-light tracking-widest uppercase">
+              {sourcesCount} source{sourcesCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
       </div>
     </header>
   )

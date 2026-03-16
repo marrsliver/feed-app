@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { SourceCategory } from '@/lib/types'
+import { queueWrite, clearWrite } from '@/lib/pendingWrites'
+import { notifyPendingWritesChanged } from './usePendingWrites'
+
+function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
+  const writeId = queueWrite(url, method, body)
+  notifyPendingWritesChanged()
+  fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  })
+    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
+    .catch(() => { /* stays in queue until replayed */ })
+}
 
 const LS_KEY = 'source_categories_cache_v1'
 
@@ -59,11 +73,7 @@ export function useSourceCategories() {
       if (prev.some((c) => c.id === id)) return prev
       const next = [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name))
       writeCache(next)
-      fetch('/api/db/source-categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCat),
-      }).catch(() => {})
+      persist('/api/db/source-categories', 'POST', newCat)
       return next
     })
     return id
@@ -75,11 +85,7 @@ export function useSourceCategories() {
       writeCache(next)
       return next
     })
-    fetch(`/api/db/source-categories/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }),
-    }).catch(() => {})
+    persist(`/api/db/source-categories/${id}`, 'PATCH', { name: name.trim() })
   }, [])
 
   const deleteCategory = useCallback((id: string) => {
@@ -88,7 +94,7 @@ export function useSourceCategories() {
       writeCache(next)
       return next
     })
-    fetch(`/api/db/source-categories/${id}`, { method: 'DELETE' }).catch(() => {})
+    persist(`/api/db/source-categories/${id}`, 'DELETE')
   }, [])
 
   return { categories, createCategory, renameCategory, deleteCategory }
