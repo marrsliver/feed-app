@@ -9,7 +9,7 @@ export function useManualPosts(feedId: string) {
   useEffect(() => {
     fetch('/api/db/manual-posts')
       .then((r) => r.json())
-      .then((data: { feedId: string; post: Post; addedAt: number }[]) => setAllPosts(data))
+      .then((data: { feedId: string; post: Post; addedAt: number }[]) => setAllPosts(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 
@@ -18,7 +18,7 @@ export function useManualPosts(feedId: string) {
     const handler = () => {
       fetch('/api/db/manual-posts')
         .then((r) => r.json())
-        .then((data: { feedId: string; post: Post; addedAt: number }[]) => setAllPosts(data))
+        .then((data: { feedId: string; post: Post; addedAt: number }[]) => setAllPosts(Array.isArray(data) ? data : []))
         .catch(() => {})
     }
     window.addEventListener('manual-posts-updated', handler)

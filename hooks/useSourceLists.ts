@@ -9,7 +9,7 @@ export function useSourceLists() {
   useEffect(() => {
     fetch('/api/db/source-lists')
       .then((r) => r.json())
-      .then((data: SourceList[]) => setLists(data))
+      .then((data: SourceList[]) => setLists(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 

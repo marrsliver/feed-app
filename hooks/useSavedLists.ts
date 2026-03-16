@@ -10,7 +10,7 @@ export function useSavedLists() {
   const refetch = useCallback(() => {
     fetch('/api/db/lists')
       .then((r) => r.json())
-      .then((data: SavedList[]) => { setLists(data); setLoaded(true) })
+      .then((data: SavedList[]) => { setLists(Array.isArray(data) ? data : []); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [])
 

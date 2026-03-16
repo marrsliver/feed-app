@@ -16,7 +16,7 @@ export function useSourceCategories() {
   useEffect(() => {
     fetch('/api/db/source-categories')
       .then((r) => r.json())
-      .then((data: SourceCategory[]) => setCategories(data))
+      .then((data: SourceCategory[]) => setCategories(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 

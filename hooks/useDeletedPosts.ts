@@ -16,7 +16,7 @@ export function useDeletedPosts() {
   useEffect(() => {
     fetch('/api/db/deleted-posts')
       .then((r) => r.json())
-      .then((data: DeletedRecord[]) => setRecords(data))
+      .then((data: DeletedRecord[]) => setRecords(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 
