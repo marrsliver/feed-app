@@ -264,7 +264,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
 
       <div className={`fixed top-0 left-0 h-full w-80 bg-white shadow-xl flex flex-col animate-slide-left ${elevated ? 'z-[55]' : 'z-50'}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-black/10 shrink-0">
           <h2 className="text-sm font-semibold text-black">Sources</h2>
           <div className="flex items-center gap-1">
             <button
@@ -348,7 +348,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
         </div>
 
         {/* Add source */}
-        <div className="px-4 py-4 border-t border-black/10 space-y-3 shrink-0">
+        <div className="px-4 py-4 border-t border-black/10 space-y-3 shrink-0 overflow-y-auto">
           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30">Add a source</p>
 
           {detect.status === 'no-feed' ? (
