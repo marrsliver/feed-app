@@ -25,7 +25,7 @@ export async function fetchForensicArchitecture(
   const apiPath = source.apiPath ?? '/api/fa/v1/investigations'
   const res = await fetch(`${source.url}${apiPath}`, {
     headers: { Accept: 'application/json' },
-    next: { revalidate: 1800 },
+    next: { revalidate: 300 },
   })
 
   if (!res.ok) {

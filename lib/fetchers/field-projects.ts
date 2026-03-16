@@ -21,7 +21,7 @@ export async function fetchFieldProjects(
 
   const res = await fetch(`${BASE}/online`, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
-    next: { revalidate: 3600 },
+    next: { revalidate: 300 },
   })
   if (!res.ok) throw new Error(`Field Projects fetch error ${res.status}`)
 
@@ -56,7 +56,7 @@ export async function fetchFieldProjects(
         const pageRes = await fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
           signal: AbortSignal.timeout(6000),
-          next: { revalidate: 3600 },
+          next: { revalidate: 300 },
         })
         if (!pageRes.ok) return
         const pageHtml = await pageRes.text()

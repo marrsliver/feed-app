@@ -25,6 +25,7 @@ type DetectState =
   | { status: 'found'; feedUrl: string; title: string; siteUrl: string }
   | { status: 'categorizing'; feedUrl: string; title: string; siteUrl: string }
   | { status: 'confirm'; feedUrl: string; title: string; siteUrl: string; suggestedCategoryId: string | null; confidence: 'high' | 'medium' | 'low' }
+  | { status: 'no-feed'; title: string; siteUrl: string }
   | { status: 'error'; message: string }
 
 type TabView = 'library' | 'feed' | 'list'
@@ -148,7 +149,9 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       const res = await fetch(`/api/detect-feed?url=${encodeURIComponent(url)}`)
       const data = await res.json()
       if (!res.ok || data.error) {
-        setDetect({ status: 'error', message: 'No RSS feed found. Try pasting the RSS URL directly.' })
+        let title = inputUrl.trim()
+        try { title = new URL(inputUrl.trim()).hostname } catch { /* use raw url */ }
+        setDetect({ status: 'no-feed', title, siteUrl: inputUrl.trim() })
       } else {
         const title = data.title || new URL(url).hostname
         const foundState = { feedUrl: data.feedUrl, title, siteUrl: url }
@@ -193,6 +196,21 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
     setInputUrl('')
     setDetect({ status: 'idle' })
     setSelectedCategoryId('')
+  }
+
+  function handleAddLibraryOnly() {
+    if (detect.status !== 'no-feed') return
+    onAddSource({
+      id: `user-${Date.now()}`,
+      name: detect.title,
+      url: detect.siteUrl,
+      feedUrl: '',
+      type: 'rss',
+      inFeed: false,
+      feedGroup: feedId,
+    })
+    setInputUrl('')
+    setDetect({ status: 'idle' })
   }
 
   // Build display lists
@@ -331,7 +349,23 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
         <div className="px-4 py-4 border-t border-black/10 space-y-3 shrink-0">
           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30">Add a source</p>
 
-          {detect.status === 'confirm' ? (
+          {detect.status === 'no-feed' ? (
+            <div className="space-y-3">
+              <div className="px-3 py-2 bg-black/5 text-sm">
+                <p className="font-medium text-black truncate">{detect.title}</p>
+                <p className="text-[10px] text-black/40 mt-0.5">No RSS feed found</p>
+              </div>
+              <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
+              <div className="flex flex-col gap-1.5">
+                <button onClick={handleAddLibraryOnly} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
+                  <BookOpen size={11} /> Add to Library Only
+                </button>
+                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : detect.status === 'confirm' ? (
             <div className="space-y-3">
               {/* Source info */}
               <div className="px-3 py-2 bg-black/5 text-sm">

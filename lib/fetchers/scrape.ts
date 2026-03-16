@@ -6,7 +6,7 @@ export async function fetchScrape(
   page: number
 ): Promise<FetcherResult> {
   const url = page > 1 ? `${source.url}/page/${page}` : source.url
-  const res = await fetch(url, { next: { revalidate: 1800 } })
+  const res = await fetch(url, { next: { revalidate: 300 } })
 
   if (!res.ok) {
     throw new Error(`Scrape error ${res.status} for ${url}`)

@@ -67,7 +67,7 @@ export async function fetchEflux(
   // Notes are all on one page — fetch and paginate client-side
   const res = await fetch(`${source.url}/notes/`, {
     headers: { 'User-Agent': UA, Accept: 'text/html' },
-    next: { revalidate: 1800 },
+    next: { revalidate: 300 },
   })
 
   if (!res.ok) {

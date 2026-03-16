@@ -5,7 +5,7 @@ const sources = [...researchSources, ...musicSources]
 import { fetchSource } from '@/lib/fetchers'
 import type { Post } from '@/lib/types'
 
-export const revalidate = 1800
+export const revalidate = 300
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl

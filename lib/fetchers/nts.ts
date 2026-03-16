@@ -28,7 +28,7 @@ export async function fetchNTS(source: Source, page: number): Promise<FetcherRes
 
   const url = `https://www.nts.live/api/v2/shows?limit=${limit}&offset=${offset}&order=latest`
 
-  const res = await fetch(url, { next: { revalidate: 3600 } })
+  const res = await fetch(url, { next: { revalidate: 300 } })
   if (!res.ok) throw new Error(`NTS fetch error ${res.status}`)
 
   const data: NTSResponse = await res.json()

@@ -36,7 +36,7 @@ export async function fetchMixcloud(source: Source, page: number): Promise<Fetch
   const username = source.apiPath ?? ''
   const url = `https://api.mixcloud.com/${username}/cloudcasts/?limit=${limit}&offset=${offset}`
 
-  const res = await fetch(url, { next: { revalidate: 3600 } })
+  const res = await fetch(url, { next: { revalidate: 300 } })
   if (!res.ok) throw new Error(`Mixcloud fetch error ${res.status}`)
 
   const data: MixcloudResponse = await res.json()
