@@ -58,8 +58,8 @@ export function SelectSourcesModal({ sources, activeSources, onConfirm, onClose 
 
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] bg-white w-full max-w-sm flex flex-col shadow-xl" style={{ maxHeight: '80vh' }}>
+      <div className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-[1px] animate-fade-in" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] bg-white w-full max-w-sm flex flex-col shadow-xl animate-scale-in" style={{ maxHeight: '80vh' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-black/10 shrink-0">
           <h2 className="text-sm font-semibold text-black">Select Sources</h2>

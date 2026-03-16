@@ -97,7 +97,7 @@ export function SourcesCardsView({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-black/10 shrink-0">
         <h1 className="font-display text-base font-semibold text-black tracking-tight">

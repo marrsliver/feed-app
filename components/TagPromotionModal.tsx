@@ -45,10 +45,10 @@ export function TagPromotionModal({ tag, sources, categories, onConfirm, onClose
 
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-[1px] animate-fade-in" onClick={onClose} />
 
       <div className="fixed inset-0 z-[90] flex items-center justify-center p-6 pointer-events-none">
-        <div className="bg-white w-full max-w-sm pointer-events-auto shadow-xl">
+        <div className="bg-white w-full max-w-sm pointer-events-auto shadow-xl animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
             <h2 className="text-sm font-semibold text-black">Promote tag to category</h2>

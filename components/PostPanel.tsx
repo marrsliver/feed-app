@@ -144,12 +144,12 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onClose }: P
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[80] bg-black/20 backdrop-blur-[1px]"
+        className="fixed inset-0 z-[80] bg-black/20 backdrop-blur-[1px] animate-fade-in"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md z-[90] bg-white flex flex-col overflow-hidden">
+      <div className="fixed top-0 right-0 h-full w-full max-w-md z-[90] bg-white flex flex-col overflow-hidden animate-slide-right">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
           <span

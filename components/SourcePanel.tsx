@@ -159,15 +159,19 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
   )
   const savedReadTotal = savedByList.reduce((n, g) => n + g.posts.length, 0) + readOnlyPosts.length
 
+  const sourceDomain = (() => {
+    try { return new URL(source.url).hostname.replace(/^www\./, '') } catch { return source.url }
+  })()
+
   return (
-    <div className="fixed top-0 right-0 h-full w-full max-w-md z-[70] bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10">
+    <div className="fixed top-0 right-0 h-full w-full max-w-md z-[70] bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10 animate-slide-right">
         {/* Color bar */}
-        <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: source.color }} />
+        <div className="h-1 w-full shrink-0" style={{ backgroundColor: source.color }} />
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
-            {source.isStatic ? 'Built-in source' : 'User-added source'}
+          <span className="text-[10px] font-medium text-black/35 tracking-wide truncate max-w-[70%]">
+            {sourceDomain}
           </span>
           <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
             <X size={16} />
@@ -397,26 +401,21 @@ export function SourcePanel({ source, categories, allTags, sourceLists, onSetCat
               </div>
             )}
 
-            {/* Status pills */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 border border-black/10 px-1.5 py-0.5">
-                {source.isStatic ? 'Built-in' : 'User added'}
-              </span>
+            {/* Feed status + open */}
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${source.inFeed ? 'border-black/20 text-black/50' : 'border-black/10 text-black/25'}`}>
                 {source.inFeed ? 'In feed' : 'List only'}
               </span>
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
+              >
+                Visit source
+                <ArrowUpRight size={13} />
+              </a>
             </div>
-
-            {/* Open button */}
-            <a
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
-            >
-              Visit source
-              <ArrowUpRight size={13} />
-            </a>
           </div>
 
           <div className="border-t border-black/10 mx-5" />

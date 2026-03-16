@@ -79,7 +79,7 @@ function ListRow({
           }}
           onBlur={commitRename}
           onClick={(e) => e.stopPropagation()}
-          className="flex-1 text-sm border border-indigo-400 rounded px-1.5 py-0.5 outline-none"
+          className="flex-1 text-sm border border-black/40 px-1.5 py-0.5 outline-none focus:border-black/60 transition-colors"
         />
       ) : (
         <span className="flex-1 text-sm font-medium truncate">{list.name}</span>
@@ -93,22 +93,22 @@ function ListRow({
       <div ref={menuRef} className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => setMenuOpen((p) => !p)}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-200 transition-opacity"
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 transition-opacity"
           aria-label="List options"
         >
           <MoreHorizontal size={14} />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg text-xs py-1 min-w-[110px]">
+          <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-black/15 shadow-md text-xs py-0.5 min-w-[110px]">
             <button
               onClick={() => { setMenuOpen(false); setRenaming(true) }}
-              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+              className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors"
             >
               Rename
             </button>
             <button
               onClick={() => { setMenuOpen(false); onDelete(list.id) }}
-              className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-500"
+              className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-red-500"
             >
               Delete
             </button>
@@ -142,18 +142,18 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] animate-fade-in"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-72 z-50 bg-white shadow-xl flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-72 z-50 bg-white shadow-xl flex flex-col animate-slide-right">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">My Lists</h2>
+        <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
+          <h2 className="text-sm font-semibold text-black">My Lists</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black"
           >
             <X size={16} />
           </button>
@@ -191,7 +191,7 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
         </div>
 
         {/* New list */}
-        <div className="px-4 py-3 border-t border-gray-100">
+        <div className="px-4 py-3 border-t border-black/10">
           {showInput ? (
             <div className="flex gap-2">
               <input
@@ -203,11 +203,11 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
                   if (e.key === 'Escape') { setShowInput(false); setNewName('') }
                 }}
                 placeholder="List name…"
-                className="flex-1 text-sm border border-indigo-400 rounded-lg px-3 py-1.5 outline-none"
+                className="flex-1 text-sm border border-black/20 px-3 py-1.5 outline-none focus:border-black/50 transition-colors"
               />
               <button
                 onClick={handleCreate}
-                className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
+                className="text-xs font-medium bg-black text-white px-3 py-1.5 hover:bg-black/80 transition-colors"
               >
                 Add
               </button>

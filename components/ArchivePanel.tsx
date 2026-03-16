@@ -26,12 +26,12 @@ export function ArchivePanel({ records, onRestore, onClose }: Props) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] animate-fade-in"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-80 z-50 bg-white shadow-xl flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-80 z-50 bg-white shadow-xl flex flex-col animate-slide-right">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
           <h2 className="text-sm font-semibold text-black">Deleted cards</h2>

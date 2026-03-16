@@ -56,6 +56,24 @@ const BREAKPOINTS = {
   640: 1,
 }
 
+const SKELETON_HEIGHTS = [180, 260, 140, 220, 300, 160, 240, 190, 280, 150, 210, 170]
+
+function FeedSkeleton() {
+  return (
+    <Masonry
+      breakpointCols={BREAKPOINTS}
+      className="flex -ml-4 w-auto"
+      columnClassName="pl-4 bg-clip-padding"
+    >
+      {SKELETON_HEIGHTS.map((h, i) => (
+        <div key={i} className="break-inside-avoid mb-4">
+          <div className="skeleton" style={{ height: h }} />
+        </div>
+      ))}
+    </Masonry>
+  )
+}
+
 async function fetchUserSourcePosts(source: LibrarySource, page: number): Promise<{ posts: Post[]; hasMore: boolean }> {
   const params = new URLSearchParams({
     url: source.feedUrl,
@@ -258,117 +276,136 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
-        <div className="flex items-center gap-3">
-          {/* Sources button — research feed only */}
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
+        <div className="flex items-center gap-2">
+
+          {/* Group 1: Sources (research feed only) */}
           {showSources && (
-            <button
-              onClick={() => setSourcesOpen(true)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
-            >
-              <Rss size={13} />
-              Sources
-            </button>
+            <>
+              <button
+                onClick={() => setSourcesOpen(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+              >
+                <Rss size={12} />
+                Sources
+              </button>
+              <div className="w-px h-4 bg-black/10 shrink-0" />
+            </>
           )}
 
-          <div className="flex-1">
+          {/* Search */}
+          <div className="flex-1 min-w-0">
             <SearchBar value={query} onChange={setQuery} />
           </div>
 
-          {/* Add button: opens sources sidebar for research feed, add link panel otherwise */}
-          <button
-            onClick={() => showSources ? setSourcesOpen(true) : setAddLinkOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
-          >
-            <LinkIcon size={13} />
-            Add
-          </button>
-
-          {/* Randomize button */}
-          <button
-            onClick={() => setIsRandomized(v => !v)}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
-              isRandomized
-                ? 'bg-black text-white border-black'
-                : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
-            }`}
-            title="Toggle recency bias"
-          >
-            <Shuffle size={13} />
-            Shuffle
-          </button>
-
-          {/* Select Sources button */}
-          {filterSources.length > 1 && (
+          {/* Group 2: Primary actions */}
+          <div className="shrink-0 flex items-center gap-1.5">
             <button
-              onClick={() => setSelectSourcesOpen(true)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+              onClick={() => setAddLinkOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
             >
-              Filter
+              <LinkIcon size={12} />
+              Add link
             </button>
-          )}
-
-          {/* Ask for help button */}
-          <button
-            onClick={() => setAskOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
-          >
-            <Sparkles size={13} />
-            Ask
-          </button>
-
-          {/* Archive button */}
-          {deletedPosts.length > 0 && (
             <button
-              onClick={() => setArchiveOpen(true)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+              onClick={() => setAskOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
             >
-              <Archive size={13} />
-              Archive ({deletedPosts.length})
+              <Sparkles size={12} />
+              Ask
             </button>
-          )}
+          </div>
 
-          {/* Unread filter toggle */}
-          <button
-            onClick={() => setShowUnreadOnly((v) => !v)}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
-              showUnreadOnly
-                ? 'bg-black text-white border-black'
-                : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
-            }`}
-          >
-            Unread{!showUnreadOnly && unreadCount > 0 && (
-              <span className="text-[9px] font-semibold">{unreadCount}</span>
+          <div className="w-px h-4 bg-black/10 shrink-0" />
+
+          {/* Group 3: Display toggles */}
+          <div className="shrink-0 flex items-center gap-1.5">
+            {/* Unread filter toggle */}
+            <button
+              onClick={() => setShowUnreadOnly((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
+                showUnreadOnly
+                  ? 'bg-black text-white border-black'
+                  : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
+              }`}
+            >
+              Unread
+              {!showUnreadOnly && unreadCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[9px] font-bold bg-black/10 text-black/60 leading-none">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Shuffle */}
+            <button
+              onClick={() => setIsRandomized(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
+                isRandomized
+                  ? 'bg-black text-white border-black'
+                  : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
+              }`}
+              title="Remove recency bias from ranking"
+            >
+              <Shuffle size={12} />
+              Shuffle
+            </button>
+
+            {/* Filter sources */}
+            {filterSources.length > 1 && (
+              <button
+                onClick={() => setSelectSourcesOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+              >
+                Filter
+              </button>
             )}
-          </button>
+          </div>
 
-          {/* Lists button / active filter chip */}
-          {isFiltering ? (
-            <div className="shrink-0 flex items-center border border-black bg-black text-white text-xs font-medium overflow-hidden">
+          <div className="w-px h-4 bg-black/10 shrink-0" />
+
+          {/* Group 4: Organize */}
+          <div className="shrink-0 flex items-center gap-1.5">
+            {/* Archive */}
+            {deletedPosts.length > 0 && (
+              <button
+                onClick={() => setArchiveOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
+                title={`${deletedPosts.length} archived card${deletedPosts.length !== 1 ? 's' : ''}`}
+              >
+                <Archive size={12} />
+                <span className="text-[9px] font-bold">{deletedPosts.length}</span>
+              </button>
+            )}
+
+            {/* Lists button / active filter chip */}
+            {isFiltering ? (
+              <div className="flex items-center border border-black bg-black text-white text-xs font-medium overflow-hidden">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 hover:bg-black/80 transition-colors"
+                >
+                  <BookmarkCheck size={12} />
+                  {activeList?.name}
+                </button>
+                <button
+                  onClick={() => setView('all')}
+                  aria-label="Clear filter"
+                  className="pr-2.5 pl-1 py-1.5 hover:bg-black/80 transition-colors text-white/50 hover:text-white text-sm leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 hover:bg-black/80 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
               >
-                <BookmarkCheck size={13} />
-                {activeList?.name}
+                <BookmarkIcon size={12} />
+                Lists
               </button>
-              <button
-                onClick={() => setView('all')}
-                aria-label="Clear filter"
-                className="pr-2.5 pl-1 py-1.5 hover:bg-black/80 transition-colors text-white/50 hover:text-white"
-              >
-                ×
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
-            >
-              <BookmarkIcon size={13} />
-              Lists
-            </button>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-4">
@@ -504,12 +541,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         />
       )}
 
-      {/* Status */}
-      {status === 'pending' && feedStaticSources.length > 0 && (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-black/20" size={32} />
-        </div>
-      )}
+      {/* Skeleton loader */}
+      {status === 'pending' && feedStaticSources.length > 0 && <FeedSkeleton />}
 
       {status === 'error' && (
         <div className="text-center py-20 text-red-500 text-sm">

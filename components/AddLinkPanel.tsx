@@ -79,9 +79,9 @@ export function AddLinkPanel({ feedId, onAdd, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] animate-fade-in" onClick={onClose} />
 
-      <div className="fixed top-0 right-0 h-full w-full max-w-md z-50 bg-white flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-full max-w-md z-50 bg-white flex flex-col animate-slide-right">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
           <div className="flex items-center gap-2">

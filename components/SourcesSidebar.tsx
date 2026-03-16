@@ -260,9 +260,9 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
 
   return (
     <>
-      <div className={`fixed inset-0 bg-black/20 backdrop-blur-[1px] ${elevated ? 'z-[51]' : 'z-40'}`} onClick={onClose} />
+      <div className={`fixed inset-0 bg-black/20 backdrop-blur-[1px] animate-fade-in ${elevated ? 'z-[51]' : 'z-40'}`} onClick={onClose} />
 
-      <div className={`fixed top-0 left-0 h-full w-80 bg-white shadow-xl flex flex-col ${elevated ? 'z-[55]' : 'z-50'}`}>
+      <div className={`fixed top-0 left-0 h-full w-80 bg-white shadow-xl flex flex-col animate-slide-left ${elevated ? 'z-[55]' : 'z-50'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
           <h2 className="text-sm font-semibold text-black">Sources</h2>

@@ -63,7 +63,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Pro
             {/* Source + bookmark */}
             <div className="flex items-center justify-between gap-2">
               <span
-                className="text-[9px] font-semibold uppercase tracking-[0.15em] px-1.5 py-0.5"
+                className="text-[10px] font-semibold uppercase tracking-[0.12em]"
                 style={{ color: post.sourceColor }}
               >
                 {post.sourceName}
@@ -72,13 +72,13 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete }: Pro
             </div>
 
             {/* Title */}
-            <h2 className={`font-display text-sm font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? 'text-black/35' : 'text-black'}`}>
+            <h2 className={`font-display text-sm font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? 'text-black/45' : 'text-black'}`}>
               {post.title}
             </h2>
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className={`text-xs leading-relaxed line-clamp-3 ${isRead ? 'text-black/20' : 'text-black/40'}`}>
+              <p className={`text-xs leading-relaxed line-clamp-3 ${isRead ? 'text-black/30' : 'text-black/40'}`}>
                 {post.excerpt}
               </p>
             )}
