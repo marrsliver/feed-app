@@ -208,9 +208,11 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       type: 'rss',
       inFeed: false,
       feedGroup: feedId,
+      categoryId: selectedCategoryId || undefined,
     })
     setInputUrl('')
     setDetect({ status: 'idle' })
+    setSelectedCategoryId('')
   }
 
   // Build display lists
@@ -356,6 +358,19 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 <p className="text-[10px] text-black/40 mt-0.5">No RSS feed found</p>
               </div>
               <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Category</p>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+                >
+                  <option value="">— None —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col gap-1.5">
                 <button onClick={handleAddLibraryOnly} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
                   <BookOpen size={11} /> Add to Library Only
