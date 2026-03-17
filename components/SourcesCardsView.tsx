@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, Tag, List, Pencil } from 'lucide-react'
+import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, ChevronRight, Tag, List, Pencil } from 'lucide-react'
 import Masonry from 'react-masonry-css'
 import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, SavedList } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
@@ -244,6 +244,14 @@ export function SourcesCardsView({
   isRead,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
+  function toggleIndustry(id: string) {
+    setExpandedIndustries(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
   const selected = selectedId ? sources.find(s => s.id === selectedId) ?? null : null
   const [promotingTag, setPromotingTag] = useState<string | null>(null)
   const [tagPanel, setTagPanel] = useState<string | null>(null)
@@ -487,47 +495,104 @@ export function SourcesCardsView({
           <p className="text-center py-20 text-black/25 text-sm">No sources match the current filters.</p>
         ) : groupedView ? (
           // Two-level grouped layout: Industry → Org Type → sources
-          <div className="space-y-12">
-            {groupedView.industryGroups.map((indGroup) => (
-              <div key={indGroup.indId}>
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/50 mb-5 pb-2 border-b border-black/10">
-                  {indGroup.indName}
-                </h2>
-                <div className="space-y-8">
-                  {indGroup.orgGroups.map((og) => (
-                    <div key={og.catId}>
-                      <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/30 mb-4 pb-1.5 border-b border-black/8">
-                        {og.catName}
-                      </h3>
-                      <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+          <div className="space-y-16">
+            {groupedView.industryGroups.map((indGroup) => {
+              const collapsed = !expandedIndustries.has(indGroup.indId)
+              return (
+                <div key={indGroup.indId}>
+                  <button
+                    onClick={() => toggleIndustry(indGroup.indId)}
+                    className="w-full flex items-center gap-2 text-left mb-6 pb-2.5 border-b-2 border-black/20 group"
+                  >
+                    {collapsed
+                      ? <ChevronRight size={13} className="text-black/40 shrink-0" />
+                      : <ChevronDown size={13} className="text-black/40 shrink-0" />
+                    }
+                    <span className="text-xs font-bold uppercase tracking-[0.22em] text-black">
+                      {indGroup.indName}
+                    </span>
+                  </button>
+                  {!collapsed && (
+                    <div className="pl-2 space-y-8 border-l-2 border-black/6">
+                      {indGroup.orgGroups.map((og) => (
+                        <div key={og.catId}>
+                          <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
+                            {og.catName}
+                          </h3>
+                          <div className="ml-3">
+                            <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                          </div>
+                        </div>
+                      ))}
+                      {indGroup.ungrouped.length > 0 && (
+                        <div className="ml-3">
+                          <SourceCardGrid sources={indGroup.ungrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                        </div>
+                      )}
                     </div>
-                  ))}
-                  {indGroup.ungrouped.length > 0 && (
-                    <SourceCardGrid sources={indGroup.ungrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
                   )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {(groupedView.otherOrgGroups.length > 0 || groupedView.otherUngrouped.length > 0) && (
               <div>
-                {groupedView.industryGroups.length > 0 && (
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/25 mb-5 pb-2 border-b border-black/8">
-                    Other
-                  </h2>
+                {groupedView.industryGroups.length > 0 && (() => {
+                  const collapsed = !expandedIndustries.has('__other__')
+                  return (
+                    <>
+                      <button
+                        onClick={() => toggleIndustry('__other__')}
+                        className="w-full flex items-center gap-2 text-left mb-6 pb-2.5 border-b-2 border-black/10 group"
+                      >
+                        {collapsed
+                          ? <ChevronRight size={13} className="text-black/25 shrink-0" />
+                          : <ChevronDown size={13} className="text-black/25 shrink-0" />
+                        }
+                        <span className="text-xs font-bold uppercase tracking-[0.22em] text-black/30">
+                          Other
+                        </span>
+                      </button>
+                      {!collapsed && (
+                        <div className="pl-2 space-y-8 border-l-2 border-black/6">
+                          {groupedView.otherOrgGroups.map((og) => (
+                            <div key={og.catId}>
+                              <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
+                                {og.catName}
+                              </h3>
+                              <div className="ml-3">
+                                <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                              </div>
+                            </div>
+                          ))}
+                          {groupedView.otherUngrouped.length > 0 && (
+                            <div className="ml-3">
+                              <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+                {groupedView.industryGroups.length === 0 && (
+                  <div className="pl-2 space-y-8 border-l-2 border-black/6">
+                    {groupedView.otherOrgGroups.map((og) => (
+                      <div key={og.catId}>
+                        <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
+                          {og.catName}
+                        </h3>
+                        <div className="ml-3">
+                          <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                        </div>
+                      </div>
+                    ))}
+                    {groupedView.otherUngrouped.length > 0 && (
+                      <div className="ml-3">
+                        <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                      </div>
+                    )}
+                  </div>
                 )}
-                <div className="space-y-8">
-                  {groupedView.otherOrgGroups.map((og) => (
-                    <div key={og.catId}>
-                      <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/30 mb-4 pb-1.5 border-b border-black/8">
-                        {og.catName}
-                      </h3>
-                      <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
-                    </div>
-                  ))}
-                  {groupedView.otherUngrouped.length > 0 && (
-                    <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
-                  )}
-                </div>
               </div>
             )}
           </div>

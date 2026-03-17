@@ -431,6 +431,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           allStaticSources={staticSources}
           userSources={userSources}
           categories={categories}
+          industries={industries}
           onAddSource={addSource}
           onRemoveSource={removeSource}
           onRenameSource={renameSource}

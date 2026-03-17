@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink, Pencil } from 'lucide-react'
-import type { LibrarySource, SourceCategory } from '@/lib/types'
+import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
+import type { LibrarySource, SourceCategory, SourceIndustry } from '@/lib/types'
 
 interface Props {
   feedId: string
@@ -10,6 +10,7 @@ interface Props {
   allStaticSources?: LibrarySource[]
   userSources: LibrarySource[]
   categories: SourceCategory[]
+  industries?: SourceIndustry[]
   onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => void
   onRemoveSource: (id: string) => void
   onRenameSource?: (id: string, name: string) => void
@@ -161,12 +162,20 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
+export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
   const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
   const [tab, setTab] = useState<TabView>('library')
+  const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
+  function toggleIndustry(id: string) {
+    setExpandedIndustries(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -266,30 +275,56 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
   const feedList = [...allStatic, ...allUser.filter((s) => s.kind === 'user' && (s as { inFeed: boolean }).inFeed)].sort(byName)
   const listOnlyList = allUser.filter((s) => s.kind === 'user' && !(s as { inFeed: boolean }).inFeed).sort(byName)
 
-  // Build grouped hierarchy for library tab (uses all static sources across feed groups)
+  // Build two-level grouped hierarchy for library tab: Industry → Org Type → sources
   const allLibrary = [...allLibraryStatic, ...allUser].sort(byName)
   const allLibrarySources = [...libraryStaticSources, ...userSources]
-  type GroupedCategory = { categoryId: string; categoryName: string; items: DisplaySource[] }
-  const grouped: GroupedCategory[] = []
-  const uncategorized: DisplaySource[] = []
+
+  type OrgGroup = { catId: string; catName: string; items: DisplaySource[] }
+  type IndGroup = { indId: string; indName: string; orgGroups: OrgGroup[]; ungrouped: DisplaySource[] }
+
+  const indMap = new Map<string, IndGroup>()
+  const noIndustryOrgMap = new Map<string, OrgGroup>()
+  const noIndustryUngrouped: DisplaySource[] = []
 
   for (const s of allLibrary) {
     const src = allLibrarySources.find((r) => r.id === s.id)
     const catId = src?.categoryId
-    if (catId) {
-      const cat = categories.find((c) => c.id === catId)
-      const catName = cat?.name ?? catId
-      let group = grouped.find((g) => g.categoryId === catId)
-      if (!group) {
-        group = { categoryId: catId, categoryName: catName, items: [] }
-        grouped.push(group)
+    const indId = src?.industryId
+
+    if (indId) {
+      if (!indMap.has(indId)) {
+        const ind = industries.find((i) => i.id === indId)
+        indMap.set(indId, { indId, indName: ind?.name ?? indId, orgGroups: [], ungrouped: [] })
       }
-      group.items.push(s)
+      const indGroup = indMap.get(indId)!
+      if (catId) {
+        let og = indGroup.orgGroups.find((g) => g.catId === catId)
+        if (!og) {
+          const cat = categories.find((c) => c.id === catId)
+          og = { catId, catName: cat?.name ?? catId, items: [] }
+          indGroup.orgGroups.push(og)
+        }
+        og.items.push(s)
+      } else {
+        indGroup.ungrouped.push(s)
+      }
     } else {
-      uncategorized.push(s)
+      if (catId) {
+        if (!noIndustryOrgMap.has(catId)) {
+          const cat = categories.find((c) => c.id === catId)
+          noIndustryOrgMap.set(catId, { catId, catName: cat?.name ?? catId, items: [] })
+        }
+        noIndustryOrgMap.get(catId)!.items.push(s)
+      } else {
+        noIndustryUngrouped.push(s)
+      }
     }
   }
-  grouped.sort((a, b) => a.categoryName.localeCompare(b.categoryName))
+
+  const industryGroups = Array.from(indMap.values())
+    .sort((a, b) => a.indName.localeCompare(b.indName))
+    .map((g) => ({ ...g, orgGroups: g.orgGroups.sort((a, b) => a.catName.localeCompare(b.catName)) }))
+  const otherOrgGroups = Array.from(noIndustryOrgMap.values()).sort((a, b) => a.catName.localeCompare(b.catName))
 
   const TABS: { id: TabView; label: string }[] = [
     { id: 'library', label: 'Library' },
@@ -341,31 +376,108 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
             allLibrary.length === 0 ? (
               <p className="text-center py-10 text-black/25 text-xs">No sources yet.</p>
             ) : (
-              <div className="space-y-4">
-                {grouped.map((group) => (
-                  <div key={group.categoryId}>
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8">
-                      {group.categoryName}
-                    </p>
-                    <div className="space-y-0.5">
-                      {group.items.map((s) => (
-                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
-                      ))}
+              <div className="space-y-5">
+                {industryGroups.map((indGroup) => {
+                  const collapsed = !expandedIndustries.has(indGroup.indId)
+                  return (
+                    <div key={indGroup.indId}>
+                      <button
+                        onClick={() => toggleIndustry(indGroup.indId)}
+                        className="w-full flex items-center gap-1.5 text-left mb-2 pb-1.5 border-b-2 border-black/15"
+                      >
+                        {collapsed
+                          ? <ChevronRight size={10} className="text-black/40 shrink-0" />
+                          : <ChevronDown size={10} className="text-black/40 shrink-0" />
+                        }
+                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-black/70">
+                          {indGroup.indName}
+                        </span>
+                      </button>
+                      {!collapsed && (
+                        <div className="pl-2 border-l-2 border-black/6 space-y-3 mt-2">
+                          {indGroup.orgGroups.map((og) => (
+                            <div key={og.catId}>
+                              <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8 ml-1">
+                                {og.catName}
+                              </p>
+                              <div className="space-y-0.5 ml-1">
+                                {og.items.map((s) => (
+                                  <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          {indGroup.ungrouped.map((s) => (
+                            <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-                {uncategorized.length > 0 && (
+                  )
+                })}
+                {(otherOrgGroups.length > 0 || noIndustryUngrouped.length > 0) && (
                   <div>
-                    {grouped.length > 0 && (
-                      <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/20 mb-1 pb-1 border-b border-black/8">
-                        Uncategorized
-                      </p>
+                    {industryGroups.length > 0 && (() => {
+                      const collapsed = !expandedIndustries.has('__other__')
+                      return (
+                        <>
+                          <button
+                            onClick={() => toggleIndustry('__other__')}
+                            className="w-full flex items-center gap-1.5 text-left mb-2 pb-1.5 border-b-2 border-black/8"
+                          >
+                            {collapsed
+                              ? <ChevronRight size={10} className="text-black/25 shrink-0" />
+                              : <ChevronDown size={10} className="text-black/25 shrink-0" />
+                            }
+                            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-black/25">
+                              Other
+                            </span>
+                          </button>
+                          {!collapsed && (
+                            <div className="pl-2 border-l-2 border-black/6 space-y-3 mt-2">
+                              {otherOrgGroups.map((og) => (
+                                <div key={og.catId}>
+                                  <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8 ml-1">
+                                    {og.catName}
+                                  </p>
+                                  <div className="space-y-0.5 ml-1">
+                                    {og.items.map((s) => (
+                                      <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="space-y-0.5">
+                                {noIndustryUngrouped.map((s) => (
+                                  <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                    {industryGroups.length === 0 && (
+                      <div className="space-y-3">
+                        {otherOrgGroups.map((og) => (
+                          <div key={og.catId}>
+                            <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8">
+                              {og.catName}
+                            </p>
+                            <div className="space-y-0.5">
+                              {og.items.map((s) => (
+                                <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="space-y-0.5">
+                          {noIndustryUngrouped.map((s) => (
+                            <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    <div className="space-y-0.5">
-                      {uncategorized.map((s) => (
-                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
