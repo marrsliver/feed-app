@@ -37,6 +37,7 @@ type SortMode = 'name' | 'newest' | 'oldest'
 function SourceCard({
   s,
   categories,
+  industries,
   noteCount,
   onSelect,
   setTagPanel,
@@ -46,6 +47,7 @@ function SourceCard({
 }: {
   s: LibrarySource
   categories: SourceCategory[]
+  industries: SourceIndustry[]
   noteCount: number
   onSelect: () => void
   setTagPanel: (tag: string) => void
@@ -57,6 +59,7 @@ function SourceCard({
   const [nameValue, setNameValue] = useState(s.name)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const category = categories.find((c) => c.id === s.categoryId)
+  const industry = industries.find((i) => i.id === s.industryId)
 
   function handleStartRename(e: React.MouseEvent) {
     e.stopPropagation()
@@ -121,10 +124,22 @@ function SourceCard({
           <ExternalLink size={9} className="shrink-0" />
           {s.url.replace(/^https?:\/\/(www\.)?/, '')}
         </a>
-        {category && (
-          <span className="inline-block text-[9px] font-semibold uppercase tracking-[0.12em] text-black/50 border border-black/20 px-1.5 py-0.5">
-            {category.name}
-          </span>
+        {(industry || category) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {industry && (
+              <span className="text-[8px] font-medium uppercase tracking-[0.12em] text-black/25">
+                {industry.name}
+              </span>
+            )}
+            {industry && category && (
+              <span className="text-[8px] text-black/15">·</span>
+            )}
+            {category && (
+              <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/50 border border-black/20 px-1.5 py-0.5">
+                {category.name}
+              </span>
+            )}
+          </div>
         )}
         {s.tags.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
@@ -173,6 +188,7 @@ function SourceCard({
 function SourceCardGrid({
   sources,
   categories,
+  industries,
   getComments,
   setSelectedId,
   setTagPanel,
@@ -182,6 +198,7 @@ function SourceCardGrid({
 }: {
   sources: LibrarySource[]
   categories: SourceCategory[]
+  industries: SourceIndustry[]
   getComments: (id: string) => unknown[]
   setSelectedId: (id: string) => void
   setTagPanel: (tag: string) => void
@@ -200,6 +217,7 @@ function SourceCardGrid({
           <SourceCard
             s={s}
             categories={categories}
+            industries={industries}
             noteCount={getComments(s.id).length}
             onSelect={() => setSelectedId(s.id)}
             setTagPanel={setTagPanel}
@@ -498,39 +516,43 @@ export function SourcesCardsView({
           <div className="space-y-16">
             {groupedView.industryGroups.map((indGroup) => {
               const collapsed = !expandedIndustries.has(indGroup.indId)
+              const total = indGroup.orgGroups.reduce((n, og) => n + og.sources.length, 0) + indGroup.ungrouped.length
               return (
                 <div key={indGroup.indId}>
                   <button
                     onClick={() => toggleIndustry(indGroup.indId)}
-                    className="w-full flex items-center gap-2 text-left mb-6 pb-2.5 border-b-2 border-black/20 group"
+                    className="w-full flex items-center gap-2 text-left mb-6 pb-2.5 border-b-2 border-black/20"
                   >
                     {collapsed
                       ? <ChevronRight size={13} className="text-black/40 shrink-0" />
                       : <ChevronDown size={13} className="text-black/40 shrink-0" />
                     }
-                    <span className="text-xs font-bold uppercase tracking-[0.22em] text-black">
+                    <span className="text-xs font-bold uppercase tracking-[0.22em] text-black flex-1">
                       {indGroup.indName}
                     </span>
+                    <span className="text-[10px] font-medium text-black/25 tabular-nums">{total}</span>
                   </button>
-                  {!collapsed && (
-                    <div className="pl-2 space-y-8 border-l-2 border-black/6">
-                      {indGroup.orgGroups.map((og) => (
-                        <div key={og.catId}>
-                          <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
-                            {og.catName}
-                          </h3>
-                          <div className="ml-3">
-                            <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                  <div className={`grid transition-all duration-300 ease-in-out ${collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
+                    <div className="overflow-hidden">
+                      <div className="pl-2 space-y-8 border-l-2 border-black/6">
+                        {indGroup.orgGroups.map((og) => (
+                          <div key={og.catId}>
+                            <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
+                              {og.catName}
+                            </h3>
+                            <div className="ml-3">
+                              <SourceCardGrid sources={og.sources} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                      {indGroup.ungrouped.length > 0 && (
-                        <div className="ml-3">
-                          <SourceCardGrid sources={indGroup.ungrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
-                        </div>
-                      )}
+                        ))}
+                        {indGroup.ungrouped.length > 0 && (
+                          <div className="ml-3">
+                            <SourceCardGrid sources={indGroup.ungrouped} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )
             })}
@@ -538,39 +560,43 @@ export function SourcesCardsView({
               <div>
                 {groupedView.industryGroups.length > 0 && (() => {
                   const collapsed = !expandedIndustries.has('__other__')
+                  const total = groupedView.otherOrgGroups.reduce((n, og) => n + og.sources.length, 0) + groupedView.otherUngrouped.length
                   return (
                     <>
                       <button
                         onClick={() => toggleIndustry('__other__')}
-                        className="w-full flex items-center gap-2 text-left mb-6 pb-2.5 border-b-2 border-black/10 group"
+                        className="w-full flex items-center gap-2 text-left mb-6 pb-2.5 border-b-2 border-black/10"
                       >
                         {collapsed
                           ? <ChevronRight size={13} className="text-black/25 shrink-0" />
                           : <ChevronDown size={13} className="text-black/25 shrink-0" />
                         }
-                        <span className="text-xs font-bold uppercase tracking-[0.22em] text-black/30">
+                        <span className="text-xs font-bold uppercase tracking-[0.22em] text-black/30 flex-1">
                           Other
                         </span>
+                        <span className="text-[10px] font-medium text-black/20 tabular-nums">{total}</span>
                       </button>
-                      {!collapsed && (
-                        <div className="pl-2 space-y-8 border-l-2 border-black/6">
-                          {groupedView.otherOrgGroups.map((og) => (
-                            <div key={og.catId}>
-                              <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
-                                {og.catName}
-                              </h3>
-                              <div className="ml-3">
-                                <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                      <div className={`grid transition-all duration-300 ease-in-out ${collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
+                        <div className="overflow-hidden">
+                          <div className="pl-2 space-y-8 border-l-2 border-black/6">
+                            {groupedView.otherOrgGroups.map((og) => (
+                              <div key={og.catId}>
+                                <h3 className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 mb-4 pb-1.5 border-b border-black/10 ml-3">
+                                  {og.catName}
+                                </h3>
+                                <div className="ml-3">
+                                  <SourceCardGrid sources={og.sources} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                          {groupedView.otherUngrouped.length > 0 && (
-                            <div className="ml-3">
-                              <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
-                            </div>
-                          )}
+                            ))}
+                            {groupedView.otherUngrouped.length > 0 && (
+                              <div className="ml-3">
+                                <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </>
                   )
                 })()}
@@ -582,13 +608,13 @@ export function SourcesCardsView({
                           {og.catName}
                         </h3>
                         <div className="ml-3">
-                          <SourceCardGrid sources={og.sources} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                          <SourceCardGrid sources={og.sources} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
                         </div>
                       </div>
                     ))}
                     {groupedView.otherUngrouped.length > 0 && (
                       <div className="ml-3">
-                        <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+                        <SourceCardGrid sources={groupedView.otherUngrouped} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
                       </div>
                     )}
                   </div>
@@ -598,7 +624,7 @@ export function SourcesCardsView({
           </div>
         ) : (
           // Flat layout (filtered or date-sorted)
-          <SourceCardGrid sources={filteredSorted} categories={categories} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
+          <SourceCardGrid sources={filteredSorted} categories={categories} industries={industries} getComments={getComments} setSelectedId={setSelectedId} setTagPanel={setTagPanel} onRemoveTag={onRemoveTag} onToggleFeed={onToggleFeed} onRenameSource={onRenameSource} />
         )}
       </div>
 

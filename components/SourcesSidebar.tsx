@@ -379,6 +379,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
               <div className="space-y-5">
                 {industryGroups.map((indGroup) => {
                   const collapsed = !expandedIndustries.has(indGroup.indId)
+                  const total = indGroup.orgGroups.reduce((n, og) => n + og.items.length, 0) + indGroup.ungrouped.length
                   return (
                     <div key={indGroup.indId}>
                       <button
@@ -389,29 +390,32 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                           ? <ChevronRight size={10} className="text-black/40 shrink-0" />
                           : <ChevronDown size={10} className="text-black/40 shrink-0" />
                         }
-                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-black/70">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-black/70 flex-1">
                           {indGroup.indName}
                         </span>
+                        <span className="text-[9px] font-medium text-black/25 tabular-nums">{total}</span>
                       </button>
-                      {!collapsed && (
-                        <div className="pl-2 border-l-2 border-black/6 space-y-3 mt-2">
-                          {indGroup.orgGroups.map((og) => (
-                            <div key={og.catId}>
-                              <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8 ml-1">
-                                {og.catName}
-                              </p>
-                              <div className="space-y-0.5 ml-1">
-                                {og.items.map((s) => (
-                                  <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
-                                ))}
+                      <div className={`grid transition-all duration-300 ease-in-out ${collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
+                        <div className="overflow-hidden">
+                          <div className="pl-2 border-l-2 border-black/6 space-y-3 mt-2">
+                            {indGroup.orgGroups.map((og) => (
+                              <div key={og.catId}>
+                                <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8 ml-1">
+                                  {og.catName}
+                                </p>
+                                <div className="space-y-0.5 ml-1">
+                                  {og.items.map((s) => (
+                                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                          {indGroup.ungrouped.map((s) => (
-                            <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
-                          ))}
+                            ))}
+                            {indGroup.ungrouped.map((s) => (
+                              <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                            ))}
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   )
                 })}
@@ -419,6 +423,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                   <div>
                     {industryGroups.length > 0 && (() => {
                       const collapsed = !expandedIndustries.has('__other__')
+                      const total = otherOrgGroups.reduce((n, og) => n + og.items.length, 0) + noIndustryUngrouped.length
                       return (
                         <>
                           <button
@@ -429,31 +434,34 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                               ? <ChevronRight size={10} className="text-black/25 shrink-0" />
                               : <ChevronDown size={10} className="text-black/25 shrink-0" />
                             }
-                            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-black/25">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-black/25 flex-1">
                               Other
                             </span>
+                            <span className="text-[9px] font-medium text-black/20 tabular-nums">{total}</span>
                           </button>
-                          {!collapsed && (
-                            <div className="pl-2 border-l-2 border-black/6 space-y-3 mt-2">
-                              {otherOrgGroups.map((og) => (
-                                <div key={og.catId}>
-                                  <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8 ml-1">
-                                    {og.catName}
-                                  </p>
-                                  <div className="space-y-0.5 ml-1">
-                                    {og.items.map((s) => (
-                                      <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
-                                    ))}
+                          <div className={`grid transition-all duration-300 ease-in-out ${collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
+                            <div className="overflow-hidden">
+                              <div className="pl-2 border-l-2 border-black/6 space-y-3 mt-2">
+                                {otherOrgGroups.map((og) => (
+                                  <div key={og.catId}>
+                                    <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/30 mb-1 pb-1 border-b border-black/8 ml-1">
+                                      {og.catName}
+                                    </p>
+                                    <div className="space-y-0.5 ml-1">
+                                      {og.items.map((s) => (
+                                        <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                              <div className="space-y-0.5">
-                                {noIndustryUngrouped.map((s) => (
-                                  <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
                                 ))}
+                                <div className="space-y-0.5">
+                                  {noIndustryUngrouped.map((s) => (
+                                    <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={false} />
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          )}
+                          </div>
                         </>
                       )
                     })()}
