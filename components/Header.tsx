@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function Header({ activeFeed, sourcesCount, onShowSources }: Props) {
-  const { pendingCount, retrying, retry } = usePendingWrites()
+  const { pendingCount, retrying, retry, dismissAll } = usePendingWrites()
 
   return (
     <header className="border-b border-black/10">
@@ -56,15 +56,24 @@ export function Header({ activeFeed, sourcesCount, onShowSources }: Props) {
 
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
-            <button
-              onClick={retry}
-              disabled={retrying}
-              title={`${pendingCount} unsaved change${pendingCount !== 1 ? 's' : ''} — click to retry`}
-              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50 transition-colors"
-            >
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              {retrying ? 'Saving…' : `${pendingCount} unsaved`}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={retry}
+                disabled={retrying}
+                title={`${pendingCount} unsaved change${pendingCount !== 1 ? 's' : ''} — click to retry`}
+                className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50 transition-colors"
+              >
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                {retrying ? 'Saving…' : `${pendingCount} unsaved`}
+              </button>
+              <button
+                onClick={dismissAll}
+                title="Dismiss"
+                className="text-amber-500 hover:text-amber-700 transition-colors leading-none"
+              >
+                ×
+              </button>
+            </div>
           )}
           {sourcesCount !== undefined && (
             <span className="text-xs text-black/30 font-light tracking-widest uppercase">

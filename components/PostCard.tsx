@@ -17,6 +17,8 @@ interface Props {
   onAddNoteToSpace?: (content: string) => void
   onOpenPost?: (post: Post) => void
   onSavedToSpace?: (post: Post) => void
+  savedInSpaces?: { id: string; name: string }[]
+  onNavigateToSpace?: (spaceId: string) => void
 }
 
 function formatDate(dateStr: string): string {
@@ -31,7 +33,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost, onSavedToSpace }: Props) {
+export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost, onSavedToSpace, savedInSpaces, onNavigateToSpace }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
@@ -101,6 +103,21 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpe
             <p className="text-[9px] text-black/25 tracking-widest uppercase pt-0.5">
               {formatDate(post.date)}
             </p>
+
+            {/* Saved in spaces */}
+            {savedInSpaces && savedInSpaces.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1.5 border-t border-black/5 mt-1.5">
+                {savedInSpaces.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={(e) => { e.stopPropagation(); onNavigateToSpace?.(s.id) }}
+                    className="text-[9px] text-black/40 hover:text-black/70 border border-black/12 hover:border-black/25 px-1.5 py-0.5 transition-colors"
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

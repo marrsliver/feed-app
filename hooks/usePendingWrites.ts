@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getPendingCount, replayPendingWrites } from '@/lib/pendingWrites'
+import { getPendingCount, replayPendingWrites, clearAllWrites } from '@/lib/pendingWrites'
 
 // Broadcast to all hook instances in the same tab when the queue changes
 const CHANNEL = 'pending-writes-updated'
@@ -44,5 +44,11 @@ export function usePendingWrites() {
     return succeeded
   }, [refresh])
 
-  return { pendingCount, retrying, retry }
+  const dismissAll = useCallback(() => {
+    clearAllWrites()
+    refresh()
+    notifyPendingWritesChanged()
+  }, [refresh])
+
+  return { pendingCount, retrying, retry, dismissAll }
 }

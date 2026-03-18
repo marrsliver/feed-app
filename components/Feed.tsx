@@ -368,6 +368,21 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     ? allSources.find((s) => s.id === sourcesCardsPanelId) ?? null
     : null
 
+  // postId → spaces that contain this post
+  const postToSpaces = useMemo(() => {
+    const map: Record<string, { id: string; name: string }[]> = {}
+    for (const space of spaces.filter(s => !s.deletedAt)) {
+      for (const item of space.items) {
+        if (item.type === 'post' && item.refId) {
+          map[item.refId] ??= []
+          if (!map[item.refId].some(s => s.id === space.id))
+            map[item.refId].push({ id: space.id, name: space.name })
+        }
+      }
+    }
+    return map
+  }, [spaces])
+
   // commentId → spaces that have a note referencing this comment
   const commentToSpaces = useMemo(() => {
     const map: Record<string, { id: string; name: string }[]> = {}
@@ -551,6 +566,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onRemoveSource={removeSource}
           onRenameSource={renameSource}
           onToggleFeed={toggleFeed}
+          onCreateCategory={createCategory}
+          onCreateIndustry={createIndustry}
           onOpenSource={(id) => {
             openSidebarSource(id)
           }}
@@ -694,6 +711,11 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
                 setSourceOpenedFromPost(true)
               }}
               onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
+              savedInSpaces={postToSpaces[post.id] ?? []}
+              onNavigateToSpace={(spaceId) => {
+                try { sessionStorage.setItem('pendingOpenPost', JSON.stringify(post)) } catch {}
+                router.push(`/remix?space=${spaceId}`)
+              }}
             />
           ))}
         </Masonry>

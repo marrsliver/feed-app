@@ -11,8 +11,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.tags !== undefined) update.tags = body.tags
   if (body.name !== undefined) update.name = body.name
   if (body.cards !== undefined) update.cards = body.cards
-  const { error } = await getSupabase().from('user_sources').update(update).eq('id', id)
-  if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
+
+  if (body.isStatic) {
+    // Static sources may not have a DB row yet — upsert with full data
+    const record: Record<string, unknown> = {
+      id,
+      name: body.name,
+      url: body.url,
+      feed_url: body.feedUrl ?? '',
+      type: body.type ?? 'rss',
+      in_feed: body.inFeed ?? false,
+      feed_group: body.feedGroup ?? '',
+      added_at: body.addedAt ?? Date.now(),
+      is_static: true,
+      tags: body.tags ?? [],
+      ...update,
+    }
+    if (body.categoryId !== undefined) record.category_id = body.categoryId
+    if (body.industryId !== undefined) record.industry_id = body.industryId
+    const { error } = await getSupabase().from('user_sources').upsert(record, { onConflict: 'id' })
+    if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
+  } else {
+    const { error } = await getSupabase().from('user_sources').update(update).eq('id', id)
+    if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
+  }
   return NextResponse.json({ ok: true })
 }
 

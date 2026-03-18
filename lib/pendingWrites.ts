@@ -72,6 +72,10 @@ export function clearWrite(id: string) {
   save(queue)
 }
 
+export function clearAllWrites() {
+  save([])
+}
+
 export async function replayPendingWrites(): Promise<{ succeeded: number; failed: number }> {
   const queue = load()
   if (queue.length === 0) return { succeeded: 0, failed: 0 }

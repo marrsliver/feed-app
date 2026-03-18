@@ -20,6 +20,8 @@ interface Props {
   onShowCards: () => void
   elevated?: boolean
   hideBackdrop?: boolean
+  onCreateCategory?: (name: string) => string
+  onCreateIndustry?: (name: string) => string
 }
 
 type DetectState =
@@ -163,11 +165,16 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated, hideBackdrop }: Props) {
+export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated, hideBackdrop, onCreateCategory, onCreateIndustry }: Props) {
   const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
+  const [selectedIndustryId, setSelectedIndustryId] = useState<string>('')
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [creatingIndustry, setCreatingIndustry] = useState(false)
+  const [newIndustryName, setNewIndustryName] = useState('')
   const [tab, setTab] = useState<TabView>('library')
   const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
   function toggleIndustry(id: string) {
@@ -243,10 +250,12 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       inFeed,
       feedGroup: feedId,
       categoryId: selectedCategoryId || undefined,
+      industryId: selectedIndustryId || undefined,
     })
     setInputUrl('')
     setDetect({ status: 'idle' })
     setSelectedCategoryId('')
+    setSelectedIndustryId('')
   }
 
   function handleAddLibraryOnly() {
@@ -260,10 +269,30 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       inFeed: false,
       feedGroup: feedId,
       categoryId: selectedCategoryId || undefined,
+      industryId: selectedIndustryId || undefined,
     })
     setInputUrl('')
     setDetect({ status: 'idle' })
     setSelectedCategoryId('')
+    setSelectedIndustryId('')
+  }
+
+  function handleCreateCategory() {
+    const name = newCategoryName.trim()
+    if (!name || !onCreateCategory) return
+    const id = onCreateCategory(name)
+    setSelectedCategoryId(id)
+    setCreatingCategory(false)
+    setNewCategoryName('')
+  }
+
+  function handleCreateIndustry() {
+    const name = newIndustryName.trim()
+    if (!name || !onCreateIndustry) return
+    const id = onCreateIndustry(name)
+    setSelectedIndustryId(id)
+    setCreatingIndustry(false)
+    setNewIndustryName('')
   }
 
   // Build display lists
@@ -384,18 +413,49 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 <p className="text-[10px] text-black/40 mt-0.5">No RSS feed found</p>
               </div>
               <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
+              {/* Industry */}
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Industry</p>
+                {creatingIndustry ? (
+                  <div className="flex gap-1">
+                    <input autoFocus value={newIndustryName} onChange={(e) => setNewIndustryName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateIndustry(); if (e.key === 'Escape') { setCreatingIndustry(false); setNewIndustryName('') } }}
+                      placeholder="New industry name…" className="flex-1 text-xs border border-black/20 px-2 py-1.5 outline-none focus:border-black/40" />
+                    <button onClick={handleCreateIndustry} disabled={!newIndustryName.trim()} className="px-2 py-1.5 text-xs bg-black text-white hover:bg-black/80 disabled:opacity-30">Add</button>
+                    <button onClick={() => { setCreatingIndustry(false); setNewIndustryName('') }} className="px-2 py-1.5 text-xs text-black/40 hover:text-black border border-black/15">✕</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <select value={selectedIndustryId} onChange={(e) => setSelectedIndustryId(e.target.value)}
+                      className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white">
+                      <option value="">— None —</option>
+                      {industries.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                    </select>
+                    {onCreateIndustry && <button onClick={() => setCreatingIndustry(true)} className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:text-black hover:border-black/30 transition-colors" title="Create new industry"><Plus size={10} /></button>}
+                  </div>
+                )}
+              </div>
+              {/* Org Type */}
               <div className="space-y-1">
                 <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Org Type</p>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
-                >
-                  <option value="">— None —</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                {creatingCategory ? (
+                  <div className="flex gap-1">
+                    <input autoFocus value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); if (e.key === 'Escape') { setCreatingCategory(false); setNewCategoryName('') } }}
+                      placeholder="New org type name…" className="flex-1 text-xs border border-black/20 px-2 py-1.5 outline-none focus:border-black/40" />
+                    <button onClick={handleCreateCategory} disabled={!newCategoryName.trim()} className="px-2 py-1.5 text-xs bg-black text-white hover:bg-black/80 disabled:opacity-30">Add</button>
+                    <button onClick={() => { setCreatingCategory(false); setNewCategoryName('') }} className="px-2 py-1.5 text-xs text-black/40 hover:text-black border border-black/15">✕</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}
+                      className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white">
+                      <option value="">— None —</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    {onCreateCategory && <button onClick={() => setCreatingCategory(true)} className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:text-black hover:border-black/30 transition-colors" title="Create new org type"><Plus size={10} /></button>}
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <button onClick={handleAddLibraryOnly} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
@@ -414,7 +474,30 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 <p className="text-[10px] text-black/40 truncate mt-0.5">{detect.feedUrl}</p>
               </div>
 
-              {/* Org Type selector */}
+              {/* Industry */}
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Industry</p>
+                {creatingIndustry ? (
+                  <div className="flex gap-1">
+                    <input autoFocus value={newIndustryName} onChange={(e) => setNewIndustryName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateIndustry(); if (e.key === 'Escape') { setCreatingIndustry(false); setNewIndustryName('') } }}
+                      placeholder="New industry name…" className="flex-1 text-xs border border-black/20 px-2 py-1.5 outline-none focus:border-black/40" />
+                    <button onClick={handleCreateIndustry} disabled={!newIndustryName.trim()} className="px-2 py-1.5 text-xs bg-black text-white hover:bg-black/80 disabled:opacity-30">Add</button>
+                    <button onClick={() => { setCreatingIndustry(false); setNewIndustryName('') }} className="px-2 py-1.5 text-xs text-black/40 hover:text-black border border-black/15">✕</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <select value={selectedIndustryId} onChange={(e) => setSelectedIndustryId(e.target.value)}
+                      className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white">
+                      <option value="">— None —</option>
+                      {industries.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                    </select>
+                    {onCreateIndustry && <button onClick={() => setCreatingIndustry(true)} className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:text-black hover:border-black/30 transition-colors" title="Create new industry"><Plus size={10} /></button>}
+                  </div>
+                )}
+              </div>
+
+              {/* Org Type */}
               <div className="space-y-1">
                 <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">
                   Org Type
@@ -422,16 +505,24 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                     <span className="ml-1 text-black/25 normal-case">· low confidence</span>
                   )}
                 </p>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
-                >
-                  <option value="">— None —</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                {creatingCategory ? (
+                  <div className="flex gap-1">
+                    <input autoFocus value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); if (e.key === 'Escape') { setCreatingCategory(false); setNewCategoryName('') } }}
+                      placeholder="New org type name…" className="flex-1 text-xs border border-black/20 px-2 py-1.5 outline-none focus:border-black/40" />
+                    <button onClick={handleCreateCategory} disabled={!newCategoryName.trim()} className="px-2 py-1.5 text-xs bg-black text-white hover:bg-black/80 disabled:opacity-30">Add</button>
+                    <button onClick={() => { setCreatingCategory(false); setNewCategoryName('') }} className="px-2 py-1.5 text-xs text-black/40 hover:text-black border border-black/15">✕</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}
+                      className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white">
+                      <option value="">— None —</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    {onCreateCategory && <button onClick={() => setCreatingCategory(true)} className="px-2 py-1.5 text-xs border border-black/15 text-black/40 hover:text-black hover:border-black/30 transition-colors" title="Create new org type"><Plus size={10} /></button>}
+                  </div>
+                )}
               </div>
 
               <p className="text-[10px] text-black/40">How would you like to add this?</p>

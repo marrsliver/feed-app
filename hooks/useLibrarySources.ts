@@ -194,7 +194,16 @@ export function useLibrarySources() {
       if (s.id !== sourceId) return s
       if ((s.cards ?? []).some(c => c.id === card.id)) return s // already exists
       const cards = [...(s.cards ?? []), card]
-      persist(`/api/db/user-sources/${sourceId}`, 'PATCH', { cards })
+      // Static sources may not have a DB row yet — include full data so API can upsert
+      const body: Record<string, unknown> = { cards }
+      if (s.isStatic) {
+        body.name = s.name; body.url = s.url; body.feedUrl = s.feedUrl ?? ''
+        body.type = s.type; body.inFeed = s.inFeed; body.feedGroup = s.feedGroup ?? ''
+        body.addedAt = s.addedAt || Date.now(); body.isStatic = true; body.tags = s.tags ?? []
+        if (s.categoryId) body.categoryId = s.categoryId
+        if (s.industryId) body.industryId = s.industryId
+      }
+      persist(`/api/db/user-sources/${sourceId}`, 'PATCH', body)
       return { ...s, cards }
     }))
   }, [updateSources])
