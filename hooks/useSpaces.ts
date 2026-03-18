@@ -35,6 +35,13 @@ function writeDeletedIds(ids: Set<string>) {
   try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...ids])) } catch { /* ignore */ }
 }
 
+// Cross-instance sync: all useSpaces() instances share state via a custom event
+const SPACES_EVENT = 'spaces-updated'
+function notifySpacesChanged(spaces: Space[]) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(SPACES_EVENT, { detail: spaces }))
+}
+
 function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
   const writeId = queueWrite(url, method, body)
   notifyPendingWritesChanged()
@@ -84,6 +91,16 @@ export function useSpaces() {
   const spacesRef = useRef(spaces)
   useEffect(() => { spacesRef.current = spaces }, [spaces])
 
+  // Subscribe to cross-instance updates (e.g. BookmarkButton ↔ PostPanel staying in sync)
+  useEffect(() => {
+    function onUpdate(e: Event) {
+      const updated = (e as CustomEvent<Space[]>).detail
+      setSpaces(updated)
+    }
+    window.addEventListener(SPACES_EVENT, onUpdate)
+    return () => window.removeEventListener(SPACES_EVENT, onUpdate)
+  }, [])
+
   const refetch = useCallback(() => {
     fetch('/api/db/lists')
       .then((r) => r.json())
@@ -128,6 +145,7 @@ export function useSpaces() {
     setSpaces((prev) => {
       const next = applyUpdate(prev, spaceId, mutate)
       writeCache(next)
+      notifySpacesChanged(next)
       return next
     })
   }, [])
@@ -136,7 +154,7 @@ export function useSpaces() {
     const id = Date.now().toString()
     const newSpace: Space = { id, name: name.trim(), items: [], createdAt: Date.now() }
     spacesRef.current = [...spacesRef.current, newSpace]
-    setSpaces((prev) => { const next = [...prev, newSpace]; writeCache(next); return next })
+    setSpaces((prev) => { const next = [...prev, newSpace]; writeCache(next); notifySpacesChanged(next); return next })
     persist('/api/db/lists', 'POST', newSpace)
     return id
   }, [])
@@ -150,7 +168,7 @@ export function useSpaces() {
     writeTrash(newTrash)
     setTrashedSpaces(newTrash)
     const ids = readDeletedIds(); ids.add(id); writeDeletedIds(ids)
-    setSpaces((prev) => { const next = prev.filter((s) => s.id !== id); writeCache(next); return next })
+    setSpaces((prev) => { const next = prev.filter((s) => s.id !== id); writeCache(next); notifySpacesChanged(next); return next })
   }, [])
 
   const restoreSpace = useCallback((id: string) => {
@@ -162,7 +180,7 @@ export function useSpaces() {
     writeTrash(newTrash)
     setTrashedSpaces(newTrash)
     const ids = readDeletedIds(); ids.delete(id); writeDeletedIds(ids)
-    setSpaces((prev) => { const next = [...prev, restored]; writeCache(next); return next })
+    setSpaces((prev) => { const next = [...prev, restored]; writeCache(next); notifySpacesChanged(next); return next })
   }, [])
 
   const permanentDeleteSpace = useCallback((id: string) => {

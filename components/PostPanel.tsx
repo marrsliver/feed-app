@@ -25,6 +25,7 @@ interface Props {
   inline?: boolean
   onCreateSpace?: (name: string, noteContent: string) => void
   savedInSpaces?: { id: string; name: string }[]
+  onSavedToSpace?: (post: Post) => void
 }
 
 function formatDate(dateStr: string): string {
@@ -139,7 +140,7 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces }: Props) {
+export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces, onSavedToSpace }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getPostSpaces } = useKnowledgeGraph()
   const isManual = post.sourceId === 'manual'
@@ -270,7 +271,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
             </span>
           )}
           <div className="flex items-center gap-2">
-            <BookmarkButton post={post} />
+            <BookmarkButton post={post} onAdded={onSavedToSpace} />
             <button
               onClick={onClose}
               className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black"

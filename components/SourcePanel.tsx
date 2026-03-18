@@ -272,7 +272,11 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   function cardSpaceNames(cardId: string): { id: string; name: string }[] {
     if (!savedLists?.length) return []
     return savedLists.flatMap(space =>
-      space.items?.some(item => item.id === cardId || item.cardRef === cardId)
+      space.items?.some(item =>
+        item.refId === cardId ||
+        item.postData?.id === cardId ||
+        item.cardRef === cardId
+      )
         ? [{ id: space.id, name: space.name }]
         : []
     )

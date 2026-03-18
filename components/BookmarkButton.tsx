@@ -8,9 +8,10 @@ import type { Post } from '@/lib/types'
 
 interface Props {
   post: Post
+  onAdded?: (post: Post) => void
 }
 
-export function BookmarkButton({ post }: Props) {
+export function BookmarkButton({ post, onAdded }: Props) {
   const { isInAnyList } = useSavedLists()
   const [open, setOpen] = useState(false)
   const saved = isInAnyList(post.id)
@@ -31,7 +32,7 @@ export function BookmarkButton({ post }: Props) {
           className={saved ? 'fill-black text-black' : 'text-black/30'}
         />
       </button>
-      {open && <ListPickerDropdown post={post} onClose={() => setOpen(false)} />}
+      {open && <ListPickerDropdown post={post} onClose={() => setOpen(false)} onAdded={onAdded} />}
     </div>
   )
 }

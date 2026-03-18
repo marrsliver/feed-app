@@ -20,7 +20,7 @@ import { SourcePanel } from './SourcePanel'
 import { PostPanel } from './PostPanel'
 import { SelectSourcesModal } from './SelectSourcesModal'
 import { TagSourcesPanel } from './TagSourcesPanel'
-import { useSavedLists } from '@/hooks/useSavedLists'
+import { useSpaces } from '@/hooks/useSpaces'
 import { useLibrarySources } from '@/hooks/useLibrarySources'
 import { useSourceLists } from '@/hooks/useSourceLists'
 import { useSourceCategories } from '@/hooks/useSourceCategories'
@@ -223,7 +223,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
-  const { lists, createList, deleteList, renameList } = useSavedLists()
+  const { spaces, lists, createSpace, createList, deleteList, renameList, addNote } = useSpaces()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
   const { deletedPosts, hiddenIds, archivePost, restorePost } = useDeletedPosts()
@@ -370,8 +370,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
 
   // Sources for the filter bar (static + user in-feed for this feedId), alphabetized
   const filterSources = useMemo(() => [
-    ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl })),
-    ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl })),
+    ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
+    ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
   ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
 
   return (
@@ -615,6 +615,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         <SelectSourcesModal
           sources={filterSources}
           activeSources={activeSources}
+          categories={categories}
+          industries={industries}
           onConfirm={(selected) => setActiveSources(selected)}
           onClose={() => setSelectSourcesOpen(false)}
         />
@@ -676,6 +678,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
                 openSidebarSource(sourceId)
                 setSourceOpenedFromPost(true)
               }}
+              onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
             />
           ))}
         </Masonry>
@@ -712,6 +715,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           try { if (openPost) sessionStorage.setItem('pendingOpenPost', JSON.stringify(openPost)) } catch {}
           router.push(`/remix?space=${spaceId}`)
         }}
+        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
+        onAddNoteToSpaceId={(content, spaceId) => addNote(spaceId, content, { postRef: openPost })}
+        onCreateSpace={(name, noteContent) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost }) }}
+        onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
         onBack={handlePanelBack}
         onClose={handlePanelClose}
       />

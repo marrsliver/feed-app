@@ -16,6 +16,7 @@ interface Props {
   onOpenSource?: (sourceId: string) => void
   onAddNoteToSpace?: (content: string) => void
   onOpenPost?: (post: Post) => void
+  onSavedToSpace?: (post: Post) => void
 }
 
 function formatDate(dateStr: string): string {
@@ -30,7 +31,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost }: Props) {
+export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost, onSavedToSpace }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
@@ -38,7 +39,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpe
       <div className="break-inside-avoid mb-4">
         <div
           onClick={() => onOpenPost ? onOpenPost(post) : setPanelOpen(true)}
-          className="group block bg-white overflow-hidden transition-all duration-300 cursor-pointer"
+          className="group block bg-white transition-all duration-300 cursor-pointer"
           style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 24px rgba(0,0,0,0.1)'
@@ -81,7 +82,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpe
                   {post.sourceName}
                 </span>
               )}
-              <BookmarkButton post={post} />
+              <BookmarkButton post={post} onAdded={onSavedToSpace} />
             </div>
 
             {/* Title */}

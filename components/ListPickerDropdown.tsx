@@ -8,9 +8,10 @@ import type { Post } from '@/lib/types'
 interface Props {
   post: Post
   onClose: () => void
+  onAdded?: (post: Post) => void
 }
 
-export function ListPickerDropdown({ post, onClose }: Props) {
+export function ListPickerDropdown({ post, onClose, onAdded }: Props) {
   const postId = post.id
   const { lists, createList, togglePostInList, isInList } = useSavedLists()
   const [newName, setNewName] = useState('')
@@ -37,6 +38,7 @@ export function ListPickerDropdown({ post, onClose }: Props) {
     if (!trimmed) return
     const id = createList(trimmed)
     togglePostInList(id, postId, post)
+    onAdded?.(post)
     setNewName('')
     setShowInput(false)
   }
@@ -55,7 +57,11 @@ export function ListPickerDropdown({ post, onClose }: Props) {
         return (
           <button
             key={list.id}
-            onClick={() => togglePostInList(list.id, postId, post)}
+            onClick={() => {
+            const wasChecked = isInList(list.id, postId)
+            togglePostInList(list.id, postId, post)
+            if (!wasChecked) onAdded?.(post)
+          }}
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/5 text-left"
           >
             <span
