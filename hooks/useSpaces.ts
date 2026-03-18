@@ -35,11 +35,15 @@ function writeDeletedIds(ids: Set<string>) {
   try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...ids])) } catch { /* ignore */ }
 }
 
-// Cross-instance sync: all useSpaces() instances share state via a custom event
+// Cross-instance sync: all useSpaces() instances share state via a custom event.
+// Deferred with setTimeout to avoid "setState during render" when the event fires
+// synchronously inside a setSpaces updater (e.g. patchSpace called mid-render).
 const SPACES_EVENT = 'spaces-updated'
 function notifySpacesChanged(spaces: Space[]) {
   if (typeof window === 'undefined') return
-  window.dispatchEvent(new CustomEvent(SPACES_EVENT, { detail: spaces }))
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent(SPACES_EVENT, { detail: spaces }))
+  }, 0)
 }
 
 function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {

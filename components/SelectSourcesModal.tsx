@@ -58,9 +58,17 @@ function GroupCheckbox({ state, onClick }: { state: CheckState; onClick: () => v
 }
 
 export function SelectSourcesModal({ sources, activeSources, categories = [], industries = [], onConfirm, onClose }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set(activeSources))
+  const allSourceIds = useMemo(() => sources.map(s => s.id), [sources])
+
+  // Start empty when all are active — groups then ADD (never confusingly deselect)
+  // Start with current selection when a partial filter is already applied
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    const allActive = sources.every(s => activeSources.has(s.id))
+    return allActive ? new Set<string>() : new Set(activeSources)
+  })
+
   const [search, setSearch] = useState('')
-  const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set(['__none__']))
+  const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -73,13 +81,12 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
 
   // Build hierarchy: industry → category → sources
   const hierarchy = useMemo(() => {
-    const industryMap = new Map<string, { id: string; name: string; categories: Map<string, { id: string; name: string; sources: SourceItem[] }>; uncategorized: SourceItem[] }>()
+    type IndEntry = { id: string; name: string; categories: Map<string, { id: string; name: string; sources: SourceItem[] }>; uncategorized: SourceItem[] }
+    const industryMap = new Map<string, IndEntry>()
 
-    // Initialize known industries
     for (const ind of industries) {
       industryMap.set(ind.id, { id: ind.id, name: ind.name, categories: new Map(), uncategorized: [] })
     }
-    // "__none__" bucket for sources with no industry
     industryMap.set('__none__', { id: '__none__', name: 'Uncategorized', categories: new Map(), uncategorized: [] })
 
     for (const source of sources) {
@@ -100,29 +107,31 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
       }
     }
 
-    // Remove empty industry buckets (except __none__ if it has sources)
-    const result: typeof industryMap = new Map()
+    // Remove empty buckets; put __none__ last
+    const named: [string, IndEntry][] = []
+    const none: [string, IndEntry][] = []
     for (const [id, ind] of industryMap) {
-      const totalSources = [...ind.categories.values()].reduce((n, c) => n + c.sources.length, 0) + ind.uncategorized.length
-      if (totalSources > 0) result.set(id, ind)
-    }
-    return result
-  }, [sources, industries, categories])
-
-  // All industries with real sources — named ones first, __none__ last
-  const orderedIndustries = useMemo(() => {
-    const named: typeof hierarchy extends Map<string, infer V> ? [string, V][] : never[] = []
-    const none: typeof named = []
-    for (const [id, ind] of hierarchy) {
+      const total = [...ind.categories.values()].reduce((n, c) => n + c.sources.length, 0) + ind.uncategorized.length
+      if (total === 0) continue
       if (id === '__none__') none.push([id, ind])
       else named.push([id, ind])
     }
-    return [...named, ...none] as [string, { id: string; name: string; categories: Map<string, { id: string; name: string; sources: SourceItem[] }>; uncategorized: SourceItem[] }][]
-  }, [hierarchy])
+    return [...named, ...none] as [string, IndEntry][]
+  }, [sources, industries, categories])
 
   const filteredSources = search.trim()
     ? sources.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
     : null
+
+  // Groups ONLY add sources — never remove on group click.
+  // Individual source checkboxes toggle freely.
+  function addGroup(ids: string[]) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(id))
+      return next
+    })
+  }
 
   function toggleSource(id: string) {
     setSelected(prev => {
@@ -133,21 +142,10 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
     })
   }
 
-  function toggleGroup(ids: string[]) {
-    setSelected(prev => {
-      const next = new Set(prev)
-      const allIn = ids.every(id => next.has(id))
-      if (allIn) ids.forEach(id => next.delete(id))
-      else ids.forEach(id => next.add(id))
-      return next
-    })
-  }
-
   function toggleIndustry(id: string) {
     setExpandedIndustries(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
@@ -155,168 +153,198 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
   function toggleCategory(id: string) {
     setExpandedCategories(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
 
-  const allSourceIds = sources.map(s => s.id)
-  const allState = groupCheckState(allSourceIds, selected)
+  // "No filter" means selected is empty → show all
+  const isNoFilter = selected.size === 0
+  // For display: when no filter, treat everything as "all"
+  const effectiveSelected = isNoFilter ? new Set(allSourceIds) : selected
+  const allState = groupCheckState(allSourceIds, effectiveSelected)
 
   function handleConfirm() {
-    onConfirm(selected.size === 0 ? new Set(allSourceIds) : selected)
+    onConfirm(isNoFilter ? new Set(allSourceIds) : selected)
     onClose()
   }
 
+  const selectedCount = isNoFilter ? allSourceIds.length : selected.size
+
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-[1px] animate-fade-in" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] bg-white w-full max-w-md flex flex-col shadow-xl animate-scale-in" style={{ maxHeight: '80vh' }}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-black/10 shrink-0">
-          <h2 className="text-sm font-semibold text-black">Filter Sources</h2>
-          <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="px-4 py-2 border-b border-black/10 shrink-0">
-          <div className="flex items-center gap-2 border border-black/15 px-2.5 py-1.5">
-            <Search size={12} className="text-black/30 shrink-0" />
-            <input
-              autoFocus
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search sources…"
-              className="flex-1 text-xs outline-none placeholder:text-black/25"
-            />
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {filteredSources ? (
-            /* Search results — flat list */
-            <>
-              <div className="px-4 py-2 text-[10px] text-black/30 uppercase tracking-widest border-b border-black/5">
-                {filteredSources.length} result{filteredSources.length !== 1 ? 's' : ''}
-              </div>
-              {filteredSources.map(s => (
-                <label key={s.id} className="flex items-center gap-3 px-4 py-2 hover:bg-black/3 cursor-pointer">
-                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                  <span className="text-sm text-black/70 flex-1">{s.name}</span>
-                </label>
-              ))}
-              {filteredSources.length === 0 && (
-                <p className="text-center py-8 text-black/25 text-xs">No sources match.</p>
-              )}
-            </>
-          ) : (
-            /* Hierarchical view */
-            <>
-              {/* All sources row */}
-              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-black/8 hover:bg-black/3">
-                <GroupCheckbox state={allState} onClick={() => toggleGroup(allSourceIds)} />
-                <span className="text-xs font-semibold text-black/70 flex-1">All sources</span>
-                <span className="text-[10px] text-black/30">{selected.size} / {allSourceIds.length}</span>
-              </div>
-
-              {orderedIndustries.map(([indId, ind]) => {
-                const allIndSources = [
-                  ...[...ind.categories.values()].flatMap(c => c.sources),
-                  ...ind.uncategorized,
-                ].map(s => s.id)
-                const indState = groupCheckState(allIndSources, selected)
-                const isExpanded = expandedIndustries.has(indId)
-                const isNone = indId === '__none__'
-
-                return (
-                  <div key={indId} className="border-b border-black/5">
-                    {/* Industry row */}
-                    <div className="flex items-center gap-2 px-4 py-2 hover:bg-black/3">
-                      <GroupCheckbox state={indState} onClick={() => toggleGroup(allIndSources)} />
-                      <button
-                        onClick={() => toggleIndustry(indId)}
-                        className="flex items-center gap-1.5 flex-1 text-left"
-                      >
-                        {isExpanded ? <ChevronDown size={12} className="text-black/30 shrink-0" /> : <ChevronRight size={12} className="text-black/30 shrink-0" />}
-                        <span className={`text-xs font-semibold ${isNone ? 'text-black/35 italic' : 'text-black/70'}`}>
-                          {ind.name}
-                        </span>
-                        <span className="text-[10px] text-black/25 ml-1">{allIndSources.length}</span>
-                      </button>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="pl-4">
-                        {/* Categories within industry */}
-                        {[...ind.categories.values()].map(cat => {
-                          const catIds = cat.sources.map(s => s.id)
-                          const catState = groupCheckState(catIds, selected)
-                          const catKey = `${indId}-${cat.id}`
-                          const catExpanded = expandedCategories.has(catKey)
-
-                          return (
-                            <div key={cat.id}>
-                              <div className="flex items-center gap-2 px-4 py-1.5 hover:bg-black/3">
-                                <GroupCheckbox state={catState} onClick={() => toggleGroup(catIds)} />
-                                <button
-                                  onClick={() => toggleCategory(catKey)}
-                                  className="flex items-center gap-1.5 flex-1 text-left"
-                                >
-                                  {catExpanded ? <ChevronDown size={11} className="text-black/25 shrink-0" /> : <ChevronRight size={11} className="text-black/25 shrink-0" />}
-                                  <span className="text-xs text-black/55">{cat.name}</span>
-                                  <span className="text-[10px] text-black/25 ml-1">{catIds.length}</span>
-                                </button>
-                              </div>
-                              {catExpanded && cat.sources.map(s => (
-                                <label key={s.id} className="flex items-center gap-3 pl-10 pr-4 py-1.5 hover:bg-black/3 cursor-pointer">
-                                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
-                                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                                  <span className="text-xs text-black/60 flex-1">{s.name}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )
-                        })}
-
-                        {/* Uncategorized within industry */}
-                        {ind.uncategorized.map(s => (
-                          <label key={s.id} className="flex items-center gap-3 px-4 py-1.5 hover:bg-black/3 cursor-pointer pl-10">
-                            <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
-                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                            <span className="text-xs text-black/60 flex-1">{s.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-black/10 shrink-0 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="text-xs text-black/40 hover:text-black transition-colors">Cancel</button>
-            <button
-              onClick={() => setSelected(new Set(allSourceIds))}
-              className="text-xs text-black/40 hover:text-black transition-colors"
-            >
-              Select all
+      {/* Backdrop + flex centering (avoids transform conflicts with animate-scale-in) */}
+      <div
+        className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-[1px] animate-fade-in flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white w-full max-w-md flex flex-col shadow-xl animate-scale-in"
+          style={{ maxHeight: '80vh' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-black/10 shrink-0">
+            <h2 className="text-sm font-semibold text-black">Filter Sources</h2>
+            <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
+              <X size={16} />
             </button>
           </div>
-          <button
-            onClick={handleConfirm}
-            className="px-4 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
-          >
-            Apply ({selected.size})
-          </button>
+
+          {/* Search */}
+          <div className="px-4 py-2 border-b border-black/10 shrink-0">
+            <div className="flex items-center gap-2 border border-black/15 px-2.5 py-1.5">
+              <Search size={12} className="text-black/30 shrink-0" />
+              <input
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search sources…"
+                className="flex-1 text-xs outline-none placeholder:text-black/25"
+              />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {filteredSources ? (
+              /* Flat search results */
+              <>
+                <div className="px-4 py-2 text-[10px] text-black/30 uppercase tracking-widest border-b border-black/5">
+                  {filteredSources.length} result{filteredSources.length !== 1 ? 's' : ''}
+                </div>
+                {filteredSources.map(s => (
+                  <label key={s.id} className="flex items-center gap-3 px-4 py-2 hover:bg-black/3 cursor-pointer">
+                    <input type="checkbox" checked={effectiveSelected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                    <span className="text-sm text-black/70 flex-1">{s.name}</span>
+                  </label>
+                ))}
+                {filteredSources.length === 0 && (
+                  <p className="text-center py-8 text-black/25 text-xs">No sources match.</p>
+                )}
+              </>
+            ) : (
+              /* Hierarchical view */
+              <>
+                {/* All sources row */}
+                <div className="flex items-center gap-3 px-4 py-2.5 border-b border-black/8 hover:bg-black/3">
+                  <GroupCheckbox
+                    state={allState}
+                    onClick={() => {
+                      // "All" row always resets to no-filter (show all)
+                      setSelected(new Set())
+                    }}
+                  />
+                  <span className="text-xs font-semibold text-black/70 flex-1">All sources</span>
+                  <span className="text-[10px] text-black/30">{selectedCount} / {allSourceIds.length}</span>
+                </div>
+
+                {hierarchy.map(([indId, ind]) => {
+                  const allIndSources = [
+                    ...[...ind.categories.values()].flatMap(c => c.sources),
+                    ...ind.uncategorized,
+                  ].map(s => s.id)
+                  const indState = groupCheckState(allIndSources, effectiveSelected)
+                  const isExpanded = expandedIndustries.has(indId)
+                  const isNone = indId === '__none__'
+
+                  return (
+                    <div key={indId} className="border-b border-black/5">
+                      {/* Industry row */}
+                      <div className="flex items-center gap-2 px-4 py-2 hover:bg-black/3">
+                        {/* Clicking industry group checkbox ADDS all its sources */}
+                        <GroupCheckbox
+                          state={indState}
+                          onClick={() => addGroup(allIndSources)}
+                        />
+                        <button
+                          onClick={() => toggleIndustry(indId)}
+                          className="flex items-center gap-1.5 flex-1 text-left"
+                        >
+                          {isExpanded
+                            ? <ChevronDown size={12} className="text-black/30 shrink-0" />
+                            : <ChevronRight size={12} className="text-black/30 shrink-0" />}
+                          <span className={`text-xs font-semibold ${isNone ? 'text-black/35 italic' : 'text-black/70'}`}>
+                            {ind.name}
+                          </span>
+                          <span className="text-[10px] text-black/25 ml-1">{allIndSources.length}</span>
+                        </button>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="pl-4">
+                          {[...ind.categories.values()].map(cat => {
+                            const catIds = cat.sources.map(s => s.id)
+                            const catState = groupCheckState(catIds, effectiveSelected)
+                            const catKey = `${indId}-${cat.id}`
+                            const catExpanded = expandedCategories.has(catKey)
+
+                            return (
+                              <div key={cat.id}>
+                                <div className="flex items-center gap-2 px-4 py-1.5 hover:bg-black/3">
+                                  {/* Clicking org type group checkbox ADDS all its sources */}
+                                  <GroupCheckbox
+                                    state={catState}
+                                    onClick={() => addGroup(catIds)}
+                                  />
+                                  <button
+                                    onClick={() => toggleCategory(catKey)}
+                                    className="flex items-center gap-1.5 flex-1 text-left"
+                                  >
+                                    {catExpanded
+                                      ? <ChevronDown size={11} className="text-black/25 shrink-0" />
+                                      : <ChevronRight size={11} className="text-black/25 shrink-0" />}
+                                    <span className="text-xs text-black/55">{cat.name}</span>
+                                    <span className="text-[10px] text-black/25 ml-1">{catIds.length}</span>
+                                  </button>
+                                </div>
+                                {catExpanded && cat.sources.map(s => (
+                                  <label key={s.id} className="flex items-center gap-3 pl-10 pr-4 py-1.5 hover:bg-black/3 cursor-pointer">
+                                    <input type="checkbox" checked={effectiveSelected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                                    <span className="text-xs text-black/60 flex-1">{s.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )
+                          })}
+
+                          {/* Uncategorized sources within this industry */}
+                          {ind.uncategorized.map(s => (
+                            <label key={s.id} className="flex items-center gap-3 pl-8 pr-4 py-1.5 hover:bg-black/3 cursor-pointer">
+                              <input type="checkbox" checked={effectiveSelected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                              <span className="text-xs text-black/60 flex-1">{s.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-3 border-t border-black/10 shrink-0 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button onClick={onClose} className="text-xs text-black/40 hover:text-black transition-colors">Cancel</button>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="text-xs text-black/40 hover:text-black transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+            <button
+              onClick={handleConfirm}
+              className="px-4 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
+            >
+              Apply {isNoFilter ? '(all)' : `(${selected.size})`}
+            </button>
+          </div>
         </div>
       </div>
     </>

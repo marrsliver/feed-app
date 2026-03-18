@@ -26,6 +26,7 @@ interface Props {
   onCreateSpace?: (name: string, noteContent: string) => void
   savedInSpaces?: { id: string; name: string }[]
   onSavedToSpace?: (post: Post) => void
+  commentToSpaces?: Record<string, { id: string; name: string }[]>
 }
 
 function formatDate(dateStr: string): string {
@@ -48,12 +49,16 @@ function NoteRow({
   onEdit,
   onDelete,
   onAddToSpace,
+  spaceLinks,
+  onNavigateToSpace,
 }: {
   text: string
   createdAt: number
   onEdit: (text: string) => void
   onDelete: () => void
   onAddToSpace?: (text: string) => void
+  spaceLinks?: { id: string; name: string }[]
+  onNavigateToSpace?: (spaceId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text)
@@ -92,6 +97,19 @@ function NoteRow({
         <p className="text-[9px] text-black/25 tracking-widest uppercase">
           {formatTime(createdAt)}
         </p>
+        {spaceLinks && spaceLinks.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {spaceLinks.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onNavigateToSpace?.(s.id)}
+                className="text-[9px] text-black/40 hover:text-black/70 transition-colors border border-black/15 px-1.5 py-0.5 hover:border-black/30"
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         {editing ? (
@@ -140,7 +158,7 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces, onSavedToSpace }: Props) {
+export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces, onSavedToSpace, commentToSpaces }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getPostSpaces } = useKnowledgeGraph()
   const isManual = post.sourceId === 'manual'
@@ -417,6 +435,8 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
                     onEdit={(text) => editComment(post.id, c.id, text)}
                     onDelete={() => deleteComment(post.id, c.id)}
                     onAddToSpace={noteAddToSpace}
+                    spaceLinks={commentToSpaces?.[c.id]}
+                    onNavigateToSpace={onNavigateToSpace}
                   />
                 ))}
               </div>

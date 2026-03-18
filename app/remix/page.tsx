@@ -1171,6 +1171,7 @@ function RemixPageInner() {
                 addNote(id, noteContent, { postRef: openPostPanel ?? undefined, sourceRef: openPostPanel?.sourceId })
               }}
               savedInSpaces={postToSpaces[openPostPanel?.id ?? ''] ?? []}
+              commentToSpaces={commentToSpaces}
             />
           )}
 

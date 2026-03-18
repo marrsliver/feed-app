@@ -368,6 +368,21 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     ? allSources.find((s) => s.id === sourcesCardsPanelId) ?? null
     : null
 
+  // commentId → spaces that have a note referencing this comment
+  const commentToSpaces = useMemo(() => {
+    const map: Record<string, { id: string; name: string }[]> = {}
+    for (const space of spaces.filter(s => !s.deletedAt)) {
+      for (const item of space.items) {
+        if (item.type === 'note' && item.commentId) {
+          map[item.commentId] ??= []
+          if (!map[item.commentId].some(s => s.id === space.id))
+            map[item.commentId].push({ id: space.id, name: space.name })
+        }
+      }
+    }
+    return map
+  }, [spaces])
+
   // Sources for the filter bar (static + user in-feed for this feedId), alphabetized
   const filterSources = useMemo(() => [
     ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
@@ -719,6 +734,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         onAddNoteToSpaceId={(content, spaceId) => addNote(spaceId, content, { postRef: openPost })}
         onCreateSpace={(name, noteContent) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost }) }}
         onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
+        commentToSpaces={commentToSpaces}
         onBack={handlePanelBack}
         onClose={handlePanelClose}
       />
