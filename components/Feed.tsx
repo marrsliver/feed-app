@@ -731,8 +731,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           router.push(`/remix?space=${spaceId}`)
         }}
         allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
-        onAddNoteToSpaceId={(content, spaceId) => addNote(spaceId, content, { postRef: openPost })}
-        onCreateSpace={(name, noteContent) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost }) }}
+        onAddNoteToSpaceId={(content, spaceId, commentId) => addNote(spaceId, content, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId })}
+        onCreateSpace={(name, noteContent, commentId) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId }) }}
         onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
         commentToSpaces={commentToSpaces}
         onBack={handlePanelBack}

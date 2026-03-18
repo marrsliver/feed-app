@@ -123,12 +123,28 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
     ? sources.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
     : null
 
-  // Groups ONLY add sources — never remove on group click.
-  // Individual source checkboxes toggle freely.
-  function addGroup(ids: string[]) {
+  // Group click: toggle all sources in group.
+  // Special case: when nothing is explicitly selected (= all active),
+  // clicking a group EXCLUDES it (sets selected = allSources - group).
+  function toggleGroup(ids: string[]) {
     setSelected(prev => {
+      if (prev.size === 0) {
+        // "All" state — clicking group means "show everything except this group"
+        const next = new Set(allSourceIds)
+        ids.forEach(id => next.delete(id))
+        return next
+      }
       const next = new Set(prev)
-      ids.forEach(id => next.add(id))
+      const allIn = ids.every(id => next.has(id))
+      if (allIn) {
+        ids.forEach(id => next.delete(id))
+        // Removing last item → normalize back to "all" (empty)
+        if (next.size === 0) return new Set<string>()
+      } else {
+        ids.forEach(id => next.add(id))
+        // All sources now in set → normalize to "all" (empty)
+        if (allSourceIds.every(id => next.has(id))) return new Set<string>()
+      }
       return next
     })
   }
@@ -256,7 +272,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
                         {/* Clicking industry group checkbox ADDS all its sources */}
                         <GroupCheckbox
                           state={indState}
-                          onClick={() => addGroup(allIndSources)}
+                          onClick={() => toggleGroup(allIndSources)}
                         />
                         <button
                           onClick={() => toggleIndustry(indId)}
@@ -286,7 +302,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
                                   {/* Clicking org type group checkbox ADDS all its sources */}
                                   <GroupCheckbox
                                     state={catState}
-                                    onClick={() => addGroup(catIds)}
+                                    onClick={() => toggleGroup(catIds)}
                                   />
                                   <button
                                     onClick={() => toggleCategory(catKey)}

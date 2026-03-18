@@ -16,14 +16,14 @@ interface Props {
   onDelete?: () => void
   onOpenSource?: (sourceId: string) => void
   onAddNoteToSpace?: (content: string) => void
-  onAddNoteToSpaceId?: (content: string, spaceId: string) => void
+  onAddNoteToSpaceId?: (content: string, spaceId: string, commentId?: string) => void
   allSpaces?: { id: string; name: string }[]
   onConnectToSource?: () => void
   onNavigateToSpace?: (spaceId: string) => void
   onBack?: () => void
   onClose: () => void
   inline?: boolean
-  onCreateSpace?: (name: string, noteContent: string) => void
+  onCreateSpace?: (name: string, noteContent: string, commentId?: string) => void
   savedInSpaces?: { id: string; name: string }[]
   onSavedToSpace?: (post: Post) => void
   commentToSpaces?: Record<string, { id: string; name: string }[]>
@@ -48,6 +48,7 @@ function NoteRow({
   createdAt,
   onEdit,
   onDelete,
+  commentId,
   onAddToSpace,
   spaceLinks,
   onNavigateToSpace,
@@ -56,7 +57,8 @@ function NoteRow({
   createdAt: number
   onEdit: (text: string) => void
   onDelete: () => void
-  onAddToSpace?: (text: string) => void
+  commentId?: string
+  onAddToSpace?: (text: string, commentId?: string) => void
   spaceLinks?: { id: string; name: string }[]
   onNavigateToSpace?: (spaceId: string) => void
 }) {
@@ -131,7 +133,7 @@ function NoteRow({
         )}
         {onAddToSpace && (
           <button
-            onClick={() => onAddToSpace(text)}
+            onClick={() => onAddToSpace(text, commentId)}
             className="p-1 text-black/20 hover:text-black/60 transition-colors"
             aria-label="Add to space"
             title="Add to current space"
@@ -169,12 +171,12 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
   const [draft, setDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [spacePickNote, setSpacePickNote] = useState<string | null>(null)
+  const [spacePickNote, setSpacePickNote] = useState<{ text: string; commentId?: string } | null>(null)
   const [newSpaceName, setNewSpaceName] = useState('')
 
   // Determine what "add to space" does for NoteRow — space picker if allSpaces provided, else direct
   const noteAddToSpace = allSpaces && onAddNoteToSpaceId
-    ? (text: string) => setSpacePickNote(text)
+    ? (text: string, commentId?: string) => setSpacePickNote({ text, commentId })
     : onAddNoteToSpace
     ? (text: string) => onAddNoteToSpace(text)
     : undefined
@@ -230,7 +232,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
               {allSpaces.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => { onAddNoteToSpaceId?.(spacePickNote, s.id); setSpacePickNote(null) }}
+                  onClick={() => { onAddNoteToSpaceId?.(spacePickNote.text, s.id, spacePickNote.commentId); setSpacePickNote(null) }}
                   className="w-full text-left px-5 py-3 text-sm hover:bg-black/5 transition-colors flex items-center gap-2"
                 >
                   <ChevronRight size={11} className="text-black/25" />
@@ -244,7 +246,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
                 onChange={(e) => setNewSpaceName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && newSpaceName.trim() && spacePickNote !== null) {
-                    onCreateSpace?.(newSpaceName.trim(), spacePickNote)
+                    onCreateSpace?.(newSpaceName.trim(), spacePickNote.text, spacePickNote.commentId)
                     setNewSpaceName('')
                     setSpacePickNote(null)
                   }
@@ -255,7 +257,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
               <button
                 onClick={() => {
                   if (!newSpaceName.trim() || spacePickNote === null) return
-                  onCreateSpace?.(newSpaceName.trim(), spacePickNote)
+                  onCreateSpace?.(newSpaceName.trim(), spacePickNote.text, spacePickNote.commentId)
                   setNewSpaceName('')
                   setSpacePickNote(null)
                 }}
@@ -432,6 +434,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
                     key={c.id}
                     text={c.text}
                     createdAt={c.createdAt}
+                    commentId={c.id}
                     onEdit={(text) => editComment(post.id, c.id, text)}
                     onDelete={() => deleteComment(post.id, c.id)}
                     onAddToSpace={noteAddToSpace}

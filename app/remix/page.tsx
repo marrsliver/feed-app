@@ -1161,14 +1161,14 @@ function RemixPageInner() {
               inline
               post={openPostPanel}
               allSpaces={spaces}
-              onAddNoteToSpaceId={(content, spaceId) => addNote(spaceId, content, { postRef: openPostPanel ?? undefined, sourceRef: openPostPanel?.sourceId })}
+              onAddNoteToSpaceId={(content, spaceId, commentId) => addNote(spaceId, content, { postRef: openPostPanel ?? undefined, sourceRef: openPostPanel?.sourceId, commentId })}
               onNavigateToSpace={(spaceId) => setSelectedSpaceId(spaceId)}
               onConnectToSource={openPostPanelItem ? () => setConnectingItem(openPostPanelItem) : undefined}
               onBack={panelHistory.length > 0 ? handleRemixPanelBack : undefined}
               onClose={handleRemixPanelClose}
-              onCreateSpace={(name, noteContent) => {
+              onCreateSpace={(name, noteContent, commentId) => {
                 const id = createSpace(name)
-                addNote(id, noteContent, { postRef: openPostPanel ?? undefined, sourceRef: openPostPanel?.sourceId })
+                addNote(id, noteContent, { postRef: openPostPanel ?? undefined, sourceRef: openPostPanel?.sourceId, commentId })
               }}
               savedInSpaces={postToSpaces[openPostPanel?.id ?? ''] ?? []}
               commentToSpaces={commentToSpaces}
