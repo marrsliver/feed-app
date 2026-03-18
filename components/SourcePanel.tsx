@@ -316,7 +316,9 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
-          <button onClick={() => (onBack ?? onClose)()} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black shrink-0"><ChevronLeft size={15} /></button>
+          {onBack && (
+            <button onClick={onBack} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black shrink-0"><ChevronLeft size={15} /></button>
+          )}
           <span className="text-[10px] font-medium text-black/35 tracking-wide truncate max-w-[70%]">
             {sourceDomain}
           </span>

@@ -24,6 +24,7 @@ interface Props {
   onClose: () => void
   inline?: boolean
   onCreateSpace?: (name: string, noteContent: string) => void
+  savedInSpaces?: { id: string; name: string }[]
 }
 
 function formatDate(dateStr: string): string {
@@ -138,13 +139,14 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace }: Props) {
+export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getPostSpaces } = useKnowledgeGraph()
   const isManual = post.sourceId === 'manual'
   const otherFeedLabel = feedId === 'research' ? 'Music Feed' : 'Research Feed'
   const comments = getComments(post.id)
   const postSpaces = getPostSpaces(post.id)
+  const displaySpaces = savedInSpaces ?? postSpaces.map(({ space }) => ({ id: space.id, name: space.name }))
   const [draft, setDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -248,7 +250,9 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
         )}
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
-          <button onClick={() => (onBack ?? onClose)()} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black shrink-0"><ChevronLeft size={15} /></button>
+          {onBack && (
+            <button onClick={onBack} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black shrink-0"><ChevronLeft size={15} /></button>
+          )}
           {onOpenSource && !isManual ? (
             <button
               onClick={() => onOpenSource(post.sourceId)}
@@ -311,16 +315,16 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
             )}
 
             {/* Space badges */}
-            {postSpaces.length > 0 && (
+            {displaySpaces.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {postSpaces.map(({ space }) => (
+                {displaySpaces.map((s) => (
                   <button
-                    key={space.id}
-                    onClick={() => onNavigateToSpace?.(space.id)}
+                    key={s.id}
+                    onClick={() => onNavigateToSpace?.(s.id)}
                     className={`text-[9px] px-1.5 py-0.5 transition-colors border ${onNavigateToSpace ? 'text-black/40 bg-black/5 border-transparent hover:border-black/20 hover:text-black/70 cursor-pointer' : 'text-black/40 bg-black/5 border-transparent cursor-default'}`}
-                    title={onNavigateToSpace ? `Open "${space.name}"` : undefined}
+                    title={onNavigateToSpace ? `Open "${s.name}"` : undefined}
                   >
-                    {space.name}
+                    {s.name}
                   </button>
                 ))}
               </div>

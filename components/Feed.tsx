@@ -742,7 +742,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         isRead={isRead}
         onAddSourceCard={addSourceCard}
         onRemoveSourceCard={removeSourceCard}
-        onNavigateToSpace={(spaceId) => router.push(`/remix?space=${spaceId}`)}
+        onNavigateToSpace={(spaceId) => {
+          try { sessionStorage.setItem('pendingOpenSource', sidebarSelectedSourceId ?? '') } catch {}
+          router.push(`/remix?space=${spaceId}`)
+        }}
         onOpenPiece={(post) => openPostInline(post)}
       />
     )}
@@ -771,7 +774,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         isRead={isRead}
         onAddSourceCard={addSourceCard}
         onRemoveSourceCard={removeSourceCard}
-        onNavigateToSpace={(spaceId) => router.push(`/remix?space=${spaceId}`)}
+        onNavigateToSpace={(spaceId) => {
+          try { sessionStorage.setItem('pendingOpenSource', sourcesCardsPanelId ?? '') } catch {}
+          router.push(`/remix?space=${spaceId}`)
+        }}
         onOpenPiece={(post) => openPostInline(post)}
       />
     )}

@@ -813,6 +813,7 @@ function RemixPageInner() {
   const [openPostPanelItem, setOpenPostPanelItem] = useState<SpaceItem | null>(null)
   const [connectingItem, setConnectingItem] = useState<SpaceItem | null>(null)
   const [pendingPost, setPendingPost] = useState<Post | null>(null)
+  const [pendingSourceId, setPendingSourceId] = useState<string | null>(null)
   const [noteForSpace, setNoteForSpace] = useState<{ content: string; sourceRef?: string; commentId?: string } | null>(null)
   const [noteForSpaceNewName, setNoteForSpaceNewName] = useState('')
 
@@ -860,6 +861,22 @@ function RemixPageInner() {
           map[item.commentId] ??= []
           if (!map[item.commentId].some(s => s.id === space.id)) {
             map[item.commentId].push({ id: space.id, name: space.name })
+          }
+        }
+      }
+    }
+    return map
+  }, [spaces])
+
+  const postToSpaces = useMemo(() => {
+    const map: Record<string, { id: string; name: string }[]> = {}
+    for (const space of spaces.filter(s => !s.deletedAt)) {
+      for (const item of space.items) {
+        if (item.type === 'post' && item.postData) {
+          const pid = item.postData.id
+          map[pid] ??= []
+          if (!map[pid].some(s => s.id === space.id)) {
+            map[pid].push({ id: space.id, name: space.name })
           }
         }
       }
@@ -931,6 +948,14 @@ function RemixPageInner() {
           setPendingPost(JSON.parse(pending) as Post)
         }
       } catch {}
+      // Pick up a source panel that was open in Feed before navigating here
+      try {
+        const pendingSource = sessionStorage.getItem('pendingOpenSource')
+        if (pendingSource) {
+          sessionStorage.removeItem('pendingOpenSource')
+          setPendingSourceId(pendingSource)
+        }
+      } catch {}
     }
   }, [spaces.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -944,6 +969,20 @@ function RemixPageInner() {
     const t = setTimeout(() => openPostPanelRef.current(post, undefined, true), 80)
     return () => clearTimeout(t)
   }, [pendingPost, selectedSpaceId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openSourcePanelRef = useRef(openSourcePanelExclusive)
+  useEffect(() => { openSourcePanelRef.current = openSourcePanelExclusive })
+
+  useEffect(() => {
+    if (!pendingSourceId || !selectedSpaceId) return
+    const id = pendingSourceId
+    setPendingSourceId(null)
+    const t = setTimeout(() => {
+      const src = sources.find(s => s.id === id)
+      if (src) openSourcePanelRef.current(src, true)
+    }, 80)
+    return () => clearTimeout(t)
+  }, [pendingSourceId, selectedSpaceId, sources]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedSpace = selectedSpaceId ? (spaces.find((s) => s.id === selectedSpaceId) ?? null) : null
 
@@ -1129,6 +1168,7 @@ function RemixPageInner() {
                 const id = createSpace(name)
                 addNote(id, noteContent, { postRef: openPostPanel ?? undefined, sourceRef: openPostPanel?.sourceId })
               }}
+              savedInSpaces={postToSpaces[openPostPanel?.id ?? ''] ?? []}
             />
           )}
 
