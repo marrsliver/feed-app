@@ -814,6 +814,8 @@ function RemixPageInner() {
   const [connectingItem, setConnectingItem] = useState<SpaceItem | null>(null)
   const [pendingPost, setPendingPost] = useState<Post | null>(null)
   const [pendingSourceId, setPendingSourceId] = useState<string | null>(null)
+  const [hasMounted, setHasMounted] = useState(false)
+  useEffect(() => setHasMounted(true), [])
   const [noteForSpace, setNoteForSpace] = useState<{ content: string; sourceRef?: string; commentId?: string } | null>(null)
   const [noteForSpaceNewName, setNoteForSpaceNewName] = useState('')
 
@@ -1088,7 +1090,7 @@ function RemixPageInner() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
-            {filteredSpaces.length === 0 && !loaded ? (
+            {!hasMounted || (filteredSpaces.length === 0 && !loaded) ? (
               <div className="flex justify-center py-10"><Loader2 className="animate-spin text-black/20" size={18} /></div>
             ) : filteredSpaces.length === 0 ? (
               <p className="text-center py-10 text-xs text-black/25">{searchQuery ? 'No matches.' : 'No spaces yet.'}</p>
