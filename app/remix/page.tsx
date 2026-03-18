@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent,
@@ -796,7 +796,7 @@ function TrashBin({
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default function RemixPage() {
+function RemixPageInner() {
   const {
     spaces, loaded, createSpace, deleteSpace, restoreSpace, permanentDeleteSpace, trashedSpaces,
     renameSpace, updateDescription, addPost, addNote, addSource, addMedia,
@@ -934,11 +934,15 @@ export default function RemixPage() {
     }
   }, [spaces.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const openPostPanelRef = useRef(openPostPanelExclusive)
+  useEffect(() => { openPostPanelRef.current = openPostPanelExclusive })
+
   useEffect(() => {
-    if (pendingPost && selectedSpaceId) {
-      openPostPanelExclusive(pendingPost)
-      setPendingPost(null)
-    }
+    if (!pendingPost || !selectedSpaceId) return
+    const post = pendingPost
+    setPendingPost(null)
+    const t = setTimeout(() => openPostPanelRef.current(post, undefined, true), 80)
+    return () => clearTimeout(t)
   }, [pendingPost, selectedSpaceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedSpace = selectedSpaceId ? (spaces.find((s) => s.id === selectedSpaceId) ?? null) : null
@@ -1045,7 +1049,7 @@ export default function RemixPage() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
-            {!loaded ? (
+            {filteredSpaces.length === 0 && !loaded ? (
               <div className="flex justify-center py-10"><Loader2 className="animate-spin text-black/20" size={18} /></div>
             ) : filteredSpaces.length === 0 ? (
               <p className="text-center py-10 text-xs text-black/25">{searchQuery ? 'No matches.' : 'No spaces yet.'}</p>
@@ -1249,5 +1253,13 @@ export default function RemixPage() {
         />
       )}
     </main>
+  )
+}
+
+export default function RemixPage() {
+  return (
+    <Suspense fallback={null}>
+      <RemixPageInner />
+    </Suspense>
   )
 }

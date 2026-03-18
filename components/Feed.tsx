@@ -109,23 +109,49 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const [openPost, setOpenPost] = useState<Post | null>(null)
   const [openPieceModal, setOpenPieceModal] = useState<Post | null>(null)
   const [sidebarTagPanel, setSidebarTagPanel] = useState<string | null>(null)
-  const [panelHistory, setPanelHistory] = useState<Array<{ type: 'source'; id: string } | { type: 'post'; post: Post }>>([])
+  const [panelHistory, setPanelHistory] = useState<Array<
+    | { type: 'source'; id: string }
+    | { type: 'post'; post: Post }
+    | { type: 'sidebar' }
+    | { type: 'cards' }
+  >>([])
 
   // Only one inline panel open at a time
   function openSidebarSource(id: string | null, skipHistory = false) {
-    if (!skipHistory && id && openPost) {
-      setPanelHistory(h => [...h, { type: 'post', post: openPost }])
+    if (!skipHistory && id) {
+      if (openPost) {
+        setPanelHistory(h => [...h, { type: 'post', post: openPost }])
+      } else if (sidebarSelectedSourceId) {
+        setPanelHistory(h => [...h, { type: 'source', id: sidebarSelectedSourceId }])
+      } else if (sourcesCardsOpen || sourcesCardsPanelId) {
+        setPanelHistory(h => [...h, { type: 'cards' }])
+      } else if (sourcesOpen) {
+        setPanelHistory(h => [...h, { type: 'sidebar' }])
+      }
     }
     setSidebarSelectedSourceId(id)
     if (id) { setSourcesCardsPanelId(null); setOpenPost(null); setOpenPieceModal(null) }
   }
-  function openSourcesCardsPanel(id: string | null) {
+  function openSourcesCardsPanel(id: string | null, skipHistory = false) {
+    if (!skipHistory && id) {
+      if (openPost) {
+        setPanelHistory(h => [...h, { type: 'post', post: openPost }])
+      } else if (sidebarSelectedSourceId) {
+        setPanelHistory(h => [...h, { type: 'source', id: sidebarSelectedSourceId }])
+      } else if (sourcesOpen) {
+        setPanelHistory(h => [...h, { type: 'sidebar' }])
+      }
+    }
     setSourcesCardsPanelId(id)
     if (id) { setSidebarSelectedSourceId(null); setOpenPost(null); setOpenPieceModal(null) }
   }
   function openPostInline(post: Post | null, skipHistory = false) {
-    if (!skipHistory && post && sidebarSelectedSourceId) {
-      setPanelHistory(h => [...h, { type: 'source', id: sidebarSelectedSourceId }])
+    if (!skipHistory && post) {
+      if (sidebarSelectedSourceId) {
+        setPanelHistory(h => [...h, { type: 'source', id: sidebarSelectedSourceId }])
+      } else if (sourcesCardsPanelId) {
+        setPanelHistory(h => [...h, { type: 'cards' }])
+      }
     }
     setOpenPost(post)
     if (post) { setSidebarSelectedSourceId(null); setSourcesCardsPanelId(null) }
@@ -134,10 +160,20 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     const last = panelHistory[panelHistory.length - 1]
     if (!last) { handlePanelClose(); return }
     setPanelHistory(h => h.slice(0, -1))
-    if (last.type === 'source') {
-      setSidebarSelectedSourceId(last.id)
-      setOpenPost(null)
+    if (last.type === 'sidebar') {
+      setSidebarSelectedSourceId(null)
       setSourcesCardsPanelId(null)
+      setOpenPost(null)
+      // sourcesOpen stays true — user sees the sidebar list again
+    } else if (last.type === 'cards') {
+      setSidebarSelectedSourceId(null)
+      setSourcesCardsPanelId(null)
+      setOpenPost(null)
+      // sourcesCardsOpen stays true
+    } else if (last.type === 'source') {
+      setSidebarSelectedSourceId(last.id)
+      setSourcesCardsPanelId(null)
+      setOpenPost(null)
     } else {
       setOpenPost(last.post)
       setSidebarSelectedSourceId(null)
@@ -506,7 +542,6 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onClose={() => setSourcesOpen(false)}
           onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
           elevated={sourcesCardsOpen}
-          hideBackdrop={!!(sidebarSelectedSourceId || sourcesCardsPanelId)}
         />
       )}
 
@@ -677,7 +712,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           try { if (openPost) sessionStorage.setItem('pendingOpenPost', JSON.stringify(openPost)) } catch {}
           router.push(`/remix?space=${spaceId}`)
         }}
-        onBack={panelHistory.length > 0 ? handlePanelBack : undefined}
+        onBack={handlePanelBack}
         onClose={handlePanelClose}
       />
     )}
@@ -700,7 +735,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         onCreateCategory={createCategory}
         onCreateIndustry={createIndustry}
         onRenameSource={renameSource}
-        onBack={panelHistory.length > 0 ? handlePanelBack : undefined}
+        onBack={handlePanelBack}
         onClose={() => { handlePanelClose() }}
         allFeedPosts={allPosts}
         savedLists={lists}
