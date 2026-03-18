@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, FolderPlus, ExternalLink, FileText, Newspaper, Database, ChevronLeft } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
-import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, SavedList } from '@/lib/types'
+import { useKnowledgeGraph } from '@/hooks/useKnowledgeGraph'
+import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, Space, SourceCard } from '@/lib/types'
+import { PostPanel } from './PostPanel'
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -16,14 +18,21 @@ function NoteRow({
   createdAt,
   onEdit,
   onDelete,
+  onAddToSpace,
+  spaceLinks,
+  onNavigateToSpace,
 }: {
   text: string
   createdAt: number
   onEdit: (text: string) => void
   onDelete: () => void
+  onAddToSpace?: (content: string) => void
+  spaceLinks?: { id: string; name: string }[]
+  onNavigateToSpace?: (spaceId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text)
+  const [confirmDel, setConfirmDel] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -58,7 +67,25 @@ function NoteRow({
         <p className="text-[9px] text-black/25 tracking-widest uppercase">
           {formatTime(createdAt)}
         </p>
+        {spaceLinks && spaceLinks.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {spaceLinks.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => onNavigateToSpace?.(s.id)}
+                className="text-[9px] text-black/40 hover:text-black/70 transition-colors border border-black/15 px-1.5 py-0.5 hover:border-black/30"
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+      {onAddToSpace && !editing && (
+        <button onClick={() => onAddToSpace(text)} className="p-1 text-black/20 hover:text-black/60 transition-colors shrink-0" aria-label="Add to space" title="Add to space">
+          <FolderPlus size={12} />
+        </button>
+      )}
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         {editing ? (
           <button onClick={commit} className="p-1 text-black/40 hover:text-black transition-colors" aria-label="Save">
@@ -69,9 +96,16 @@ function NoteRow({
             <Pencil size={12} />
           </button>
         )}
-        <button onClick={onDelete} className="p-1 text-black/20 hover:text-black/60 transition-colors" aria-label="Delete note">
-          <Trash2 size={12} />
-        </button>
+        {confirmDel ? (
+          <>
+            <button onClick={() => { onDelete(); setConfirmDel(false) }} className="p-1 text-red-400 hover:text-red-600 transition-colors text-[9px] font-medium" aria-label="Confirm delete">Yes</button>
+            <button onClick={() => setConfirmDel(false)} className="p-1 text-black/30 hover:text-black transition-colors text-[9px]" aria-label="Cancel">No</button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} className="p-1 text-black/20 hover:text-black/60 transition-colors" aria-label="Delete note">
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -94,18 +128,32 @@ interface Props {
   onCreateCategory: (name: string) => string
   onCreateIndustry?: (name: string) => string
   onRenameSource?: (id: string, name: string) => void
+  onBack?: () => void
   onClose: () => void
   topLayer?: boolean
+  inline?: boolean
   allFeedPosts?: Post[]
-  savedLists?: SavedList[]
+  savedLists?: Space[]
   isRead?: (id: string) => boolean
+  onAddNoteToSpace?: (content: string, commentId?: string) => void
+  onAddSourceCard?: (sourceId: string, card: SourceCard) => void
+  onRemoveSourceCard?: (sourceId: string, cardId: string) => void
+  onNavigateToSpace?: (spaceId: string) => void
+  onCommentEdited?: (commentId: string, newText: string) => void
+  onOpenPiece?: (post: Post) => void
+  onAddSourceToSpace?: (spaceId: string) => void
+  allSpaces?: { id: string; name: string }[]
+  commentToSpaces?: Record<string, { id: string; name: string }[]>
 }
 
-export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onClose, topLayer, allFeedPosts, savedLists, isRead }: Props) {
+export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
+  const { getSourceConnections } = useKnowledgeGraph()
+  const connections = getSourceConnections(source.id)
+  const totalConnections = connections.notes.length + connections.posts.length + connections.sourceItems.length
   const comments = getComments(source.id)
   const [draft, setDraft] = useState('')
-  const [savedReadOpen, setSavedReadOpen] = useState(false)
+  // inSpacesOpen removed — section is always expanded
   const [tagInput, setTagInput] = useState('')
   const [tagSuggestionsOpen, setTagSuggestionsOpen] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -116,10 +164,26 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   const [addingList, setAddingList] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(source.name)
+  // Pieces (manually-added links)
+  const [addingPiece, setAddingPiece] = useState(false)
+  const [pieceUrl, setPieceUrl] = useState('')
+  const [pieceTitle, setPieceTitle] = useState('')
+  const [confirmRemovePieceId, setConfirmRemovePieceId] = useState<string | null>(null)
+  const [openPiecePost, setOpenPiecePost] = useState<Post | null>(null)
+  const [expandedPieceId, setExpandedPieceId] = useState<string | null>(null)
+  const [addToSpacePickerOpen, setAddToSpacePickerOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
   const newIndustryRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const pieceUrlRef = useRef<HTMLInputElement>(null)
+  const tagInputContainerRef = useRef<HTMLDivElement>(null)
+
+  // Keep nameValue in sync when source.name updates externally
+  useEffect(() => {
+    if (!editingName) setNameValue(source.name)
+  }, [source.name, editingName])
 
   function handleSaveRename() {
     const trimmed = nameValue.trim()
@@ -153,6 +217,17 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
 
+  useEffect(() => {
+    if (!tagSuggestionsOpen) return
+    function handleClick(e: MouseEvent) {
+      if (tagInputContainerRef.current && !tagInputContainerRef.current.contains(e.target as Node)) {
+        setTagSuggestionsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [tagSuggestionsOpen])
+
   function handleSubmit() {
     if (!draft.trim()) return
     addComment(source.id, draft)
@@ -175,11 +250,11 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   const savedByList = (savedLists ?? []).map(list => ({
     id: list.id,
     name: list.name,
-    posts: list.postIds
-      .filter(id => list.postData[id]?.sourceId === source.id)
-      .map(id => list.postData[id]),
+    posts: (list.postIds ?? [])
+      .filter(id => list.postData?.[id]?.sourceId === source.id)
+      .map(id => list.postData![id]),
   })).filter(g => g.posts.length > 0)
-  const allSavedIds = new Set((savedLists ?? []).flatMap(l => l.postIds))
+  const allSavedIds = new Set((savedLists ?? []).flatMap(l => l.postIds ?? []))
   const readOnlyPosts = (allFeedPosts ?? []).filter(
     p => p.sourceId === source.id && (isRead ? isRead(p.id) : false) && !allSavedIds.has(p.id)
   )
@@ -189,13 +264,59 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
     try { return new URL(source.url).hostname.replace(/^www\./, '') } catch { return source.url }
   })()
 
+  function displayDomain(url: string) {
+    try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
+  }
+
+  // Compute which spaces a SourceCard appears in
+  function cardSpaceNames(cardId: string): { id: string; name: string }[] {
+    if (!savedLists?.length) return []
+    return savedLists.flatMap(space =>
+      space.items?.some(item => item.id === cardId || item.cardRef === cardId)
+        ? [{ id: space.id, name: space.name }]
+        : []
+    )
+  }
+
+  function pieceAsPost(card: SourceCard): Post {
+    return {
+      id: card.id,
+      title: card.title,
+      url: card.url,
+      date: new Date(card.addedAt).toISOString(),
+      sourceId: source.id,
+      sourceName: source.name,
+      sourceColor: source.color,
+    } as Post
+  }
+
+  function handleSavePiece() {
+    const url = pieceUrl.trim()
+    if (!url || !onAddSourceCard) return
+    const card: SourceCard = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      url,
+      title: pieceTitle.trim() || displayDomain(url),
+      addedAt: Date.now(),
+    }
+    onAddSourceCard(source.id, card)
+    setPieceUrl('')
+    setPieceTitle('')
+    setAddingPiece(false)
+  }
+
   return (
-    <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10 animate-slide-right ${topLayer ? 'z-[95]' : 'z-[70]'}`}>
+    <>
+    <div className={inline
+      ? 'w-[28rem] shrink-0 flex flex-col overflow-hidden border border-black/10 bg-white animate-slide-right h-[calc(100vh-57px)]'
+      : `fixed top-[57px] right-0 h-[calc(100vh-57px)] w-full max-w-md bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10 animate-slide-right ${topLayer ? 'z-[95]' : 'z-[70]'}`
+    }>
         {/* Color bar */}
         <div className="h-1 w-full shrink-0" style={{ backgroundColor: source.color }} />
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
+          <button onClick={() => (onBack ?? onClose)()} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black shrink-0"><ChevronLeft size={15} /></button>
           <span className="text-[10px] font-medium text-black/35 tracking-wide truncate max-w-[70%]">
             {sourceDomain}
           </span>
@@ -205,7 +326,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="px-5 py-5 space-y-4">
             {/* Name */}
             <div className="group/name flex items-start gap-2">
@@ -238,6 +359,22 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                   )}
                 </>
               )}
+            </div>
+
+            {/* Feed status + open */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${source.inFeed ? 'border-black/20 text-black/50' : 'border-black/10 text-black/25'}`}>
+                {source.inFeed ? 'In feed' : 'List only'}
+              </span>
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
+              >
+                Visit source
+                <ArrowUpRight size={13} />
+              </a>
             </div>
 
             {/* Industry selector */}
@@ -396,7 +533,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                   ))}
                 </div>
               )}
-              <div className="relative flex gap-1.5">
+              <div ref={tagInputContainerRef} className="relative flex gap-1.5">
                 <input
                   value={tagInput}
                   onChange={(e) => { setTagInput(e.target.value); setTagSuggestionsOpen(true) }}
@@ -515,21 +652,6 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
               </div>
             )}
 
-            {/* Feed status + open */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${source.inFeed ? 'border-black/20 text-black/50' : 'border-black/10 text-black/25'}`}>
-                {source.inFeed ? 'In feed' : 'List only'}
-              </span>
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-medium hover:bg-black/80 transition-colors"
-              >
-                Visit source
-                <ArrowUpRight size={13} />
-              </a>
-            </div>
           </div>
 
           <div className="border-t border-black/10 mx-5" />
@@ -542,15 +664,26 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
 
             {comments.length > 0 && (
               <div className="space-y-3">
-                {comments.map((c) => (
-                  <NoteRow
-                    key={c.id}
-                    text={c.text}
-                    createdAt={c.createdAt}
-                    onEdit={(text) => editComment(source.id, c.id, text)}
-                    onDelete={() => deleteComment(source.id, c.id)}
-                  />
-                ))}
+                {comments.map((c) => {
+                  const noteSpaceLinks = commentToSpaces
+                    ? (commentToSpaces[c.id] ?? [])
+                    : connections.notes
+                        .filter(({ item }) => item.commentId === c.id || item.content === c.text)
+                        .map(({ space }) => ({ id: space.id, name: space.name }))
+                        .filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i) // deduplicate
+                  return (
+                    <NoteRow
+                      key={c.id}
+                      text={c.text}
+                      createdAt={c.createdAt}
+                      onEdit={(text) => { editComment(source.id, c.id, text); onCommentEdited?.(c.id, text) }}
+                      onDelete={() => deleteComment(source.id, c.id)}
+                      onAddToSpace={onAddNoteToSpace ? (text) => onAddNoteToSpace(text, c.id) : undefined}
+                      spaceLinks={noteSpaceLinks.length > 0 ? noteSpaceLinks : undefined}
+                      onNavigateToSpace={onNavigateToSpace}
+                    />
+                  )
+                })}
               </div>
             )}
 
@@ -579,52 +712,323 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
             </div>
           </div>
 
-          {/* Saved & Read */}
-          {savedReadTotal > 0 && (
+          {/* Pieces — manually-curated links pinned to this source */}
+          {(onAddSourceCard || (source.cards ?? []).length > 0) && (
             <>
               <div className="border-t border-black/10 mx-5" />
-              <div className="px-5 py-5 space-y-3">
-                <button
-                  onClick={() => setSavedReadOpen(v => !v)}
-                  className="flex items-center gap-1.5 w-full text-left"
-                >
-                  {savedReadOpen ? <ChevronDown size={12} className="text-black/30" /> : <ChevronRight size={12} className="text-black/30" />}
+              <div className="px-5 py-5 space-y-4">
+                <div className="flex items-center justify-between">
                   <h3 className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
-                    Saved & Read ({savedReadTotal})
+                    Pieces {(source.cards ?? []).length > 0 && `(${(source.cards ?? []).length})`}
                   </h3>
-                </button>
-                {savedReadOpen && (
+                  {onAddSourceCard && !addingPiece && (
+                    <button
+                      onClick={() => { setAddingPiece(true); setTimeout(() => pieceUrlRef.current?.focus(), 10) }}
+                      className="flex items-center gap-1 text-[10px] text-black/30 hover:text-black transition-colors"
+                    >
+                      <Plus size={10} />Add link
+                    </button>
+                  )}
+                </div>
+
+                {addingPiece && (
+                  <div className="space-y-2 border border-black/10 p-3 bg-black/[0.02]">
+                    <input
+                      ref={pieceUrlRef}
+                      value={pieceUrl}
+                      onChange={(e) => setPieceUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSavePiece(); if (e.key === 'Escape') { setAddingPiece(false); setPieceUrl(''); setPieceTitle('') } }}
+                      placeholder="URL"
+                      className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                    />
+                    <input
+                      value={pieceTitle}
+                      onChange={(e) => setPieceTitle(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSavePiece(); if (e.key === 'Escape') { setAddingPiece(false); setPieceUrl(''); setPieceTitle('') } }}
+                      placeholder="Title (optional — defaults to domain)"
+                      className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSavePiece}
+                        disabled={!pieceUrl.trim()}
+                        className="px-3 py-1.5 text-xs bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => { setAddingPiece(false); setPieceUrl(''); setPieceTitle('') }}
+                        className="px-2 py-1.5 text-xs text-black/40 hover:text-black transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(source.cards ?? []).length > 0 && (
                   <div className="space-y-3">
-                    {savedByList.map(group => (
-                      <div key={group.id}>
-                        <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 mb-1">{group.name}</p>
-                        <div className="space-y-1.5">
-                          {group.posts.map(post => (
-                            <a key={post.id} href={post.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-black/60 hover:text-black transition-colors leading-snug line-clamp-2">
-                              {post.title}
-                            </a>
-                          ))}
+                    {(source.cards ?? []).map((card) => (
+                      <div key={card.id} className="group flex items-start gap-2">
+                        <div
+                          className="flex-1 min-w-0 space-y-0.5 cursor-pointer"
+                          onClick={() => onOpenPiece ? onOpenPiece(pieceAsPost(card)) : setOpenPiecePost(pieceAsPost(card))}
+                        >
+                          <p className="text-sm font-medium text-black leading-snug truncate hover:underline">{card.title}</p>
+                          {card.url && (
+                            <div className="flex items-center gap-0.5 text-[10px] text-black/35">
+                              <ExternalLink size={9} className="shrink-0" />
+                              <span className="truncate">{displayDomain(card.url)}</span>
+                            </div>
+                          )}
+                          {(() => {
+                            const cardSpaces = cardSpaceNames(card.id)
+                            if (!cardSpaces.length) return null
+                            return (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {cardSpaces.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    onClick={(e) => { e.stopPropagation(); onNavigateToSpace ? onNavigateToSpace(s.id) : (window.location.href = `/remix?space=${s.id}`) }}
+                                    className="text-[9px] text-black/30 hover:text-black/60 transition-colors border border-black/10 px-1 py-0.5 hover:border-black/25"
+                                  >
+                                    {s.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+                          {confirmRemovePieceId === card.id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-black/50">Remove?</span>
+                              <button
+                                onClick={() => { onRemoveSourceCard?.(source.id, card.id); setConfirmRemovePieceId(null) }}
+                                className="px-1.5 py-0.5 text-[10px] bg-black text-white hover:bg-black/80 transition-colors"
+                              >Yes</button>
+                              <button
+                                onClick={() => setConfirmRemovePieceId(null)}
+                                className="px-1.5 py-0.5 text-[10px] text-black/40 hover:text-black transition-colors"
+                              >No</button>
+                            </div>
+                          ) : (
+                            <>
+                              {card.url && (
+                                <a
+                                  href={card.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-1 text-black/20 hover:text-black/60 transition-colors opacity-0 group-hover:opacity-100"
+                                  aria-label="Open link"
+                                >
+                                  <ExternalLink size={12} />
+                                </a>
+                              )}
+                              {onRemoveSourceCard && (
+                                <button
+                                  onClick={() => setConfirmRemovePieceId(card.id)}
+                                  className="p-1 text-black/20 hover:text-black/60 transition-colors opacity-0 group-hover:opacity-100"
+                                  aria-label="Remove piece"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
-                    {readOnlyPosts.length > 0 && (
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 mb-1">Read</p>
-                        <div className="space-y-1.5">
-                          {readOnlyPosts.map(post => (
-                            <a key={post.id} href={post.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-black/60 hover:text-black transition-colors leading-snug line-clamp-2">
-                              {post.title}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
+                )}
+
+                {(source.cards ?? []).length === 0 && !addingPiece && (
+                  <p className="text-[10px] text-black/25">No pieces yet. Add links to curate content for this source.</p>
                 )}
               </div>
             </>
           )}
+
+          {/* In Spaces */}
+          <>
+            <div className="border-t border-black/10 mx-5" />
+            <div className="px-5 py-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                  In Spaces {totalConnections > 0 && `(${totalConnections})`}
+                </h3>
+                {onAddSourceToSpace && allSpaces && (
+                  <button
+                    onClick={() => setAddToSpacePickerOpen(v => !v)}
+                    className="text-[9px] text-black/30 hover:text-black transition-colors flex items-center gap-0.5"
+                  >
+                    <Plus size={9} />Add to space
+                  </button>
+                )}
+              </div>
+              {addToSpacePickerOpen && allSpaces && onAddSourceToSpace && (
+                <div className="border border-black/10 bg-white py-1">
+                  {allSpaces.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => { onAddSourceToSpace(s.id); setAddToSpacePickerOpen(false) }}
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 transition-colors text-black/70"
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {totalConnections === 0 && (
+                <p className="text-[10px] text-black/25">Not yet referenced in any space.</p>
+              )}
+
+              {totalConnections > 0 && (() => {
+                // Deduplicate spaces
+                const seenIds = new Set<string>()
+                const uniqueSpaces: { id: string; name: string }[] = []
+                for (const { space } of [...connections.notes, ...connections.posts, ...connections.sourceItems]) {
+                  if (!seenIds.has(space.id)) {
+                    seenIds.add(space.id)
+                    uniqueSpaces.push({ id: space.id, name: space.name })
+                  }
+                }
+                return (
+                  <div className="space-y-1">
+                    {uniqueSpaces.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => onNavigateToSpace ? onNavigateToSpace(s.id) : (window.location.href = `/remix?space=${s.id}`)}
+                        className="flex items-center gap-1.5 text-xs text-black/60 hover:text-black transition-colors w-full text-left"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-black/20 shrink-0" />
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
+
+              {totalConnections > 0 && (
+                <button
+                  onClick={() => setDetailsOpen(v => !v)}
+                  className="text-[9px] text-black/30 hover:text-black transition-colors flex items-center gap-1 mt-1"
+                >
+                  {detailsOpen ? '▾' : '▸'} Connection details
+                </button>
+              )}
+
+              {detailsOpen && (
+                <div className="space-y-3 pt-1 border-t border-black/8">
+                  {connections.notes.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 flex items-center gap-1"><FileText size={9} />Notes</p>
+                      {connections.notes.map(({ item, space }) => (
+                        <div key={`${item.id}-${space.id}`} className="flex items-start gap-2">
+                          <p className="flex-1 text-xs text-black/60 leading-snug line-clamp-2">{item.content ?? ''}</p>
+                          <button
+                            onClick={() => onNavigateToSpace ? onNavigateToSpace(space.id) : (window.location.href = `/remix?space=${space.id}`)}
+                            className="shrink-0 text-[9px] text-black/30 hover:text-black transition-colors whitespace-nowrap"
+                          >
+                            → {space.name}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {connections.posts.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 flex items-center gap-1"><Newspaper size={9} />Articles</p>
+                      {connections.posts.map(({ item, space }) => {
+                        const isExpanded = expandedPieceId === item.id
+                        return (
+                          <div key={`${item.id}-${space.id}`} className="space-y-1">
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                {item.postData ? (
+                                  <button
+                                    onClick={() => setExpandedPieceId(isExpanded ? null : item.id)}
+                                    className="text-xs text-black/70 leading-snug line-clamp-2 text-left hover:text-black transition-colors w-full"
+                                  >
+                                    {item.postData.title}
+                                  </button>
+                                ) : (
+                                  <p className="text-xs text-black/60 leading-snug line-clamp-2">{item.content ?? ''}</p>
+                                )}
+                                <span className="text-[9px] text-black/30">{space.name}</span>
+                              </div>
+                              <button
+                                onClick={() => onNavigateToSpace ? onNavigateToSpace(space.id) : (window.location.href = `/remix?space=${space.id}`)}
+                                className="shrink-0 text-[9px] text-black/30 hover:text-black transition-colors whitespace-nowrap mt-0.5"
+                              >
+                                → open
+                              </button>
+                            </div>
+                            {isExpanded && item.postData && (
+                              <div className="border border-black/8 bg-black/[0.015] p-3 space-y-2">
+                                {item.postData.image && (
+                                  <img src={item.postData.image} alt={item.postData.title} className="w-full h-20 object-cover" />
+                                )}
+                                {item.postData.excerpt && (
+                                  <p className="text-[10px] text-black/50 leading-relaxed line-clamp-3">{item.postData.excerpt}</p>
+                                )}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[9px] text-black/25 uppercase tracking-widest">
+                                    {new Date(item.postData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                  <a
+                                    href={item.postData.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[9px] text-black/40 hover:text-black transition-colors flex items-center gap-0.5"
+                                  >
+                                    Open <ArrowUpRight size={9} />
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {connections.sourceItems.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 flex items-center gap-1"><Database size={9} />As source</p>
+                      {connections.sourceItems.map(({ item, space }) => (
+                        <div key={`${item.id}-${space.id}`} className="flex items-center gap-2">
+                          <button
+                            onClick={() => onNavigateToSpace ? onNavigateToSpace(space.id) : (window.location.href = `/remix?space=${space.id}`)}
+                            className="text-xs text-black/60 hover:text-black transition-colors"
+                          >
+                            Pinned in {space.name}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+
+          {/* Bottom close button */}
+          <div className="px-5 py-6 border-t border-black/8 flex justify-center mt-4">
+            <button onClick={onClose} className="text-xs text-black/30 hover:text-black transition-colors flex items-center gap-1.5">
+              <X size={11} />Close
+            </button>
+          </div>
         </div>
     </div>
+
+    {openPiecePost && (
+      <PostPanel
+        post={openPiecePost}
+        onClose={() => setOpenPiecePost(null)}
+      />
+    )}
+    </>
   )
 }

@@ -7,7 +7,10 @@ import { getPendingCount, replayPendingWrites } from '@/lib/pendingWrites'
 const CHANNEL = 'pending-writes-updated'
 
 export function notifyPendingWritesChanged() {
-  window.dispatchEvent(new CustomEvent(CHANNEL))
+  // Defer the event so it never fires during a React render/commit cycle
+  if (typeof window !== 'undefined') {
+    queueMicrotask(() => window.dispatchEvent(new CustomEvent(CHANNEL)))
+  }
 }
 
 export function usePendingWrites() {

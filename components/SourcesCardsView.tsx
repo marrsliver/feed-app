@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { X, Rss, BookOpen, ExternalLink, MessageSquare, ChevronDown, ChevronRight, Tag, List, Pencil } from 'lucide-react'
 import Masonry from 'react-masonry-css'
-import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, SavedList } from '@/lib/types'
+import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, Space, SourceCard } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { SourcePanel } from './SourcePanel'
 import { TagPromotionModal } from './TagPromotionModal'
@@ -28,8 +28,13 @@ interface Props {
   onShowLibrary: () => void
   onClose: () => void
   allFeedPosts?: Post[]
-  savedLists?: SavedList[]
+  savedLists?: Space[]
   isRead?: (id: string) => boolean
+  // Lifted state — so the panel survives this component unmounting
+  selectedId?: string | null
+  onSelectSource?: (id: string | null) => void
+  onAddSourceCard?: (sourceId: string, card: SourceCard) => void
+  onRemoveSourceCard?: (sourceId: string, cardId: string) => void
 }
 
 type SortMode = 'name' | 'newest' | 'oldest'
@@ -260,11 +265,23 @@ export function SourcesCardsView({
   allFeedPosts,
   savedLists,
   isRead,
+  selectedId: externalSelectedId,
+  onSelectSource,
+  onAddSourceCard,
+  onRemoveSourceCard,
 }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
+  // Use lifted state if provided, otherwise fall back to internal state
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null)
+  const selectedId = externalSelectedId !== undefined ? externalSelectedId : internalSelectedId
+  function setSelectedId(id: string | null) {
+    if (onSelectSource) onSelectSource(id)
+    else setInternalSelectedId(id)
+  }
+
+  // Industries collapsed by user click — start empty (all expanded by default)
+  const [collapsedIndustries, setCollapsedIndustries] = useState<Set<string>>(new Set())
   function toggleIndustry(id: string) {
-    setExpandedIndustries(prev => {
+    setCollapsedIndustries(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
@@ -515,7 +532,7 @@ export function SourcesCardsView({
           // Two-level grouped layout: Industry → Org Type → sources
           <div className="space-y-16">
             {groupedView.industryGroups.map((indGroup) => {
-              const collapsed = !expandedIndustries.has(indGroup.indId)
+              const collapsed = collapsedIndustries.has(indGroup.indId)
               const total = indGroup.orgGroups.reduce((n, og) => n + og.sources.length, 0) + indGroup.ungrouped.length
               return (
                 <div key={indGroup.indId}>
@@ -559,7 +576,7 @@ export function SourcesCardsView({
             {(groupedView.otherOrgGroups.length > 0 || groupedView.otherUngrouped.length > 0) && (
               <div>
                 {groupedView.industryGroups.length > 0 && (() => {
-                  const collapsed = !expandedIndustries.has('__other__')
+                  const collapsed = collapsedIndustries.has('__other__')
                   const total = groupedView.otherOrgGroups.reduce((n, og) => n + og.sources.length, 0) + groupedView.otherUngrouped.length
                   return (
                     <>
@@ -650,6 +667,8 @@ export function SourcesCardsView({
           allFeedPosts={allFeedPosts}
           savedLists={savedLists}
           isRead={isRead}
+          onAddSourceCard={onAddSourceCard}
+          onRemoveSourceCard={onRemoveSourceCard}
         />
       )}
 

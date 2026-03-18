@@ -19,6 +19,7 @@ interface Props {
   onClose: () => void
   onShowCards: () => void
   elevated?: boolean
+  hideBackdrop?: boolean
 }
 
 type DetectState =
@@ -162,7 +163,7 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated }: Props) {
+export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated, hideBackdrop }: Props) {
   const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
@@ -336,7 +337,9 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
 
   return (
     <>
-      <div className={`fixed inset-0 bg-black/20 backdrop-blur-[1px] animate-fade-in ${elevated ? 'z-[51]' : 'z-40'}`} onClick={onClose} />
+      {!hideBackdrop && (
+        <div className={`fixed inset-0 bg-black/20 backdrop-blur-[1px] animate-fade-in ${elevated ? 'z-[51]' : 'z-40'}`} onClick={onClose} />
+      )}
 
       <div className={`fixed top-0 left-0 h-full w-80 bg-white shadow-xl flex flex-col animate-slide-left ${elevated ? 'z-[55]' : 'z-50'}`}>
         {/* Header */}
@@ -368,6 +371,109 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
               {label}
             </button>
           ))}
+        </div>
+
+        {/* Add source */}
+        <div className="px-4 py-4 border-b border-black/10 space-y-3 shrink-0 max-h-[50vh] overflow-y-auto">
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30">Add a source</p>
+
+          {detect.status === 'no-feed' ? (
+            <div className="space-y-3">
+              <div className="px-3 py-2 bg-black/5 text-sm">
+                <p className="font-medium text-black truncate">{detect.title}</p>
+                <p className="text-[10px] text-black/40 mt-0.5">No RSS feed found</p>
+              </div>
+              <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Org Type</p>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+                >
+                  <option value="">— None —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <button onClick={handleAddLibraryOnly} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
+                  <BookOpen size={11} /> Add to Library Only
+                </button>
+                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : detect.status === 'confirm' ? (
+            <div className="space-y-3">
+              {/* Source info */}
+              <div className="px-3 py-2 bg-black/5 text-sm">
+                <p className="font-medium text-black truncate">{detect.title}</p>
+                <p className="text-[10px] text-black/40 truncate mt-0.5">{detect.feedUrl}</p>
+              </div>
+
+              {/* Org Type selector */}
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">
+                  Org Type
+                  {detect.suggestedCategoryId && detect.confidence !== 'high' && (
+                    <span className="ml-1 text-black/25 normal-case">· low confidence</span>
+                  )}
+                </p>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
+                >
+                  <option value="">— None —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="text-[10px] text-black/40">How would you like to add this?</p>
+              <div className="flex flex-col gap-1.5">
+                <button onClick={() => handleAdd(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
+                  <Rss size={11} /> Add to feed
+                </button>
+                <button onClick={() => handleAdd(false)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-black/20 text-black/60 hover:text-black hover:border-black/40 transition-colors">
+                  <BookOpen size={11} /> Save to list only
+                </button>
+                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  value={inputUrl}
+                  onChange={(e) => { setInputUrl(e.target.value); setDetect({ status: 'idle' }) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleDetect() }}
+                  placeholder="Paste a website or RSS URL…"
+                  className="flex-1 text-xs border border-black/15 px-3 py-2 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                />
+                <button
+                  onClick={handleDetect}
+                  disabled={!inputUrl.trim() || isLoading}
+                  className="px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30"
+                >
+                  {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                </button>
+              </div>
+              {detect.status === 'categorizing' && (
+                <p className="text-[10px] text-black/40">Suggesting org type…</p>
+              )}
+              {detect.status === 'error' && (
+                <p className="text-[10px] text-red-500">{detect.message}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Source list */}
@@ -508,108 +614,6 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
           )}
         </div>
 
-        {/* Add source */}
-        <div className="px-4 py-4 border-t border-black/10 space-y-3 shrink-0 overflow-y-auto">
-          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/30">Add a source</p>
-
-          {detect.status === 'no-feed' ? (
-            <div className="space-y-3">
-              <div className="px-3 py-2 bg-black/5 text-sm">
-                <p className="font-medium text-black truncate">{detect.title}</p>
-                <p className="text-[10px] text-black/40 mt-0.5">No RSS feed found</p>
-              </div>
-              <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
-              <div className="space-y-1">
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Org Type</p>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
-                >
-                  <option value="">— None —</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <button onClick={handleAddLibraryOnly} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
-                  <BookOpen size={11} /> Add to Library Only
-                </button>
-                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : detect.status === 'confirm' ? (
-            <div className="space-y-3">
-              {/* Source info */}
-              <div className="px-3 py-2 bg-black/5 text-sm">
-                <p className="font-medium text-black truncate">{detect.title}</p>
-                <p className="text-[10px] text-black/40 truncate mt-0.5">{detect.feedUrl}</p>
-              </div>
-
-              {/* Org Type selector */}
-              <div className="space-y-1">
-                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">
-                  Org Type
-                  {detect.suggestedCategoryId && detect.confidence !== 'high' && (
-                    <span className="ml-1 text-black/25 normal-case">· low confidence</span>
-                  )}
-                </p>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors bg-white"
-                >
-                  <option value="">— None —</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <p className="text-[10px] text-black/40">How would you like to add this?</p>
-              <div className="flex flex-col gap-1.5">
-                <button onClick={() => handleAdd(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
-                  <Rss size={11} /> Add to feed
-                </button>
-                <button onClick={() => handleAdd(false)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-black/20 text-black/60 hover:text-black hover:border-black/40 transition-colors">
-                  <BookOpen size={11} /> Save to list only
-                </button>
-                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  ref={inputRef}
-                  value={inputUrl}
-                  onChange={(e) => { setInputUrl(e.target.value); setDetect({ status: 'idle' }) }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleDetect() }}
-                  placeholder="Paste a website or RSS URL…"
-                  className="flex-1 text-xs border border-black/15 px-3 py-2 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
-                />
-                <button
-                  onClick={handleDetect}
-                  disabled={!inputUrl.trim() || isLoading}
-                  className="px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30"
-                >
-                  {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                </button>
-              </div>
-              {detect.status === 'categorizing' && (
-                <p className="text-[10px] text-black/40">Suggesting org type…</p>
-              )}
-              {detect.status === 'error' && (
-                <p className="text-[10px] text-red-500">{detect.message}</p>
-              )}
-            </div>
-          )}
-        </div>
       </div>
     </>
   )

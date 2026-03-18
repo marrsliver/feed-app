@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
-import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, LinkIcon, Archive, Rss, Shuffle } from 'lucide-react'
+import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, Archive, Rss, Shuffle } from 'lucide-react'
 import type { LibrarySource, PostsApiResponse, Post } from '@/lib/types'
 import { rankPosts, rankPostsDiversified } from '@/lib/rankPosts'
 import { PostCard } from './PostCard'
@@ -16,6 +17,7 @@ import { ArchivePanel } from './ArchivePanel'
 import { SourcesSidebar } from './SourcesSidebar'
 import { SourcesCardsView } from './SourcesCardsView'
 import { SourcePanel } from './SourcePanel'
+import { PostPanel } from './PostPanel'
 import { SelectSourcesModal } from './SelectSourcesModal'
 import { TagSourcesPanel } from './TagSourcesPanel'
 import { useSavedLists } from '@/hooks/useSavedLists'
@@ -90,6 +92,7 @@ async function fetchUserSourcePosts(source: LibrarySource, page: number): Promis
 }
 
 export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsProp }: Props) {
+  const router = useRouter()
   const [activeSources, setActiveSources] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [view, setView] = useState<string>('all')
@@ -99,9 +102,56 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [sourcesCardsOpen, setSourcesCardsOpen] = useState(false)
-  const [sidebarSelectedSource, setSidebarSelectedSource] = useState<LibrarySource | null>(null)
+  // Store IDs, not object snapshots — always resolve to live source from allSources
+  const [sidebarSelectedSourceId, setSidebarSelectedSourceId] = useState<string | null>(null)
+  const [sourcesCardsPanelId, setSourcesCardsPanelId] = useState<string | null>(null)
   const [sourceOpenedFromPost, setSourceOpenedFromPost] = useState(false)
+  const [openPost, setOpenPost] = useState<Post | null>(null)
+  const [openPieceModal, setOpenPieceModal] = useState<Post | null>(null)
   const [sidebarTagPanel, setSidebarTagPanel] = useState<string | null>(null)
+  const [panelHistory, setPanelHistory] = useState<Array<{ type: 'source'; id: string } | { type: 'post'; post: Post }>>([])
+
+  // Only one inline panel open at a time
+  function openSidebarSource(id: string | null, skipHistory = false) {
+    if (!skipHistory && id && openPost) {
+      setPanelHistory(h => [...h, { type: 'post', post: openPost }])
+    }
+    setSidebarSelectedSourceId(id)
+    if (id) { setSourcesCardsPanelId(null); setOpenPost(null); setOpenPieceModal(null) }
+  }
+  function openSourcesCardsPanel(id: string | null) {
+    setSourcesCardsPanelId(id)
+    if (id) { setSidebarSelectedSourceId(null); setOpenPost(null); setOpenPieceModal(null) }
+  }
+  function openPostInline(post: Post | null, skipHistory = false) {
+    if (!skipHistory && post && sidebarSelectedSourceId) {
+      setPanelHistory(h => [...h, { type: 'source', id: sidebarSelectedSourceId }])
+    }
+    setOpenPost(post)
+    if (post) { setSidebarSelectedSourceId(null); setSourcesCardsPanelId(null) }
+  }
+  function handlePanelBack() {
+    const last = panelHistory[panelHistory.length - 1]
+    if (!last) { handlePanelClose(); return }
+    setPanelHistory(h => h.slice(0, -1))
+    if (last.type === 'source') {
+      setSidebarSelectedSourceId(last.id)
+      setOpenPost(null)
+      setSourcesCardsPanelId(null)
+    } else {
+      setOpenPost(last.post)
+      setSidebarSelectedSourceId(null)
+      setSourcesCardsPanelId(null)
+    }
+  }
+  function handlePanelClose() {
+    setPanelHistory([])
+    setSidebarSelectedSourceId(null)
+    setSourcesCardsPanelId(null)
+    setOpenPost(null)
+    setOpenPieceModal(null)
+    setSourceOpenedFromPost(false)
+  }
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [isRandomized, setIsRandomized] = useState(false)
   const [selectSourcesOpen, setSelectSourcesOpen] = useState(false)
@@ -130,6 +180,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     setIndustry,
     addTag,
     removeTag,
+    addSourceCard,
+    removeSourceCard,
   } = useLibrarySources()
 
   const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
@@ -264,13 +316,21 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const listFiltered =
     view === 'all'
       ? allPosts
-      : allPosts.filter((p) => activeList?.postIds.includes(p.id))
+      : allPosts.filter((p) => activeList?.postIds?.includes(p.id) || activeList?.items.some((i) => i.type === 'post' && i.refId === p.id))
   const displayPosts = showUnreadOnly
     ? listFiltered.filter((p) => !isRead(p.id))
     : listFiltered
 
   const isFiltering = view !== 'all'
   const unreadCount = allPosts.filter((p) => !isRead(p.id)).length
+
+  // Live-resolved sources (never stale snapshots)
+  const sidebarSelectedSource = sidebarSelectedSourceId
+    ? allSources.find((s) => s.id === sidebarSelectedSourceId) ?? null
+    : null
+  const sourcesCardsPanelSource = sourcesCardsPanelId
+    ? allSources.find((s) => s.id === sourcesCardsPanelId) ?? null
+    : null
 
   // Sources for the filter bar (static + user in-feed for this feedId), alphabetized
   const filterSources = useMemo(() => [
@@ -279,7 +339,9 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
 
   return (
-    <div className="space-y-4">
+    <>
+    <div className="flex items-start gap-0 min-w-0">
+    <div className="flex-1 min-w-0 space-y-4">
       {/* Toolbar */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
         <div className="flex items-center gap-2">
@@ -306,11 +368,11 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           {/* Group 2: Primary actions */}
           <div className="shrink-0 flex items-center gap-1.5">
             <button
-              onClick={() => setAddLinkOpen(true)}
+              onClick={() => setSourcesOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
             >
-              <LinkIcon size={12} />
-              Add link
+              <Rss size={12} />
+              Add source
             </button>
             <button
               onClick={() => setAskOpen(true)}
@@ -413,13 +475,15 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
-          <SourceFilter
-            sources={filterSources}
-            active={activeSources}
-            onToggle={toggleSource}
-            onReset={() => setActiveSources(new Set(allSourceIds))}
-          />
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <div className="flex-1 min-w-0">
+            <SourceFilter
+              sources={filterSources}
+              active={activeSources}
+              onToggle={toggleSource}
+              onReset={() => setActiveSources(new Set(allSourceIds))}
+            />
+          </div>
         </div>
       </div>
 
@@ -437,13 +501,12 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onRenameSource={renameSource}
           onToggleFeed={toggleFeed}
           onOpenSource={(id) => {
-            const source = [...staticSources, ...userSources].find((s) => s.id === id)
-            if (source) setSidebarSelectedSource(source)
-            // Don't close sidebar - keep it open
+            openSidebarSource(id)
           }}
           onClose={() => setSourcesOpen(false)}
           onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
           elevated={sourcesCardsOpen}
+          hideBackdrop={!!(sidebarSelectedSourceId || sourcesCardsPanelId)}
         />
       )}
 
@@ -470,6 +533,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           allFeedPosts={allPosts}
           savedLists={lists}
           isRead={isRead}
+          selectedId={sourcesCardsPanelId}
+          onSelectSource={openSourcesCardsPanel}
+          onAddSourceCard={addSourceCard}
+          onRemoveSourceCard={removeSourceCard}
         />
       )}
 
@@ -492,32 +559,6 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         <AskPanel posts={allPosts} onClose={() => setAskOpen(false)} />
       )}
 
-      {/* SourcePanel opened from sources sidebar */}
-      {sidebarSelectedSource && (
-        <SourcePanel
-          source={sidebarSelectedSource}
-          categories={categories}
-          industries={industries}
-          allTags={allTags}
-          sourceLists={sourceLists}
-          onSetCategory={setCategory}
-          onSetIndustry={setIndustry}
-          onAddTag={addTag}
-          onRemoveTag={removeTag}
-          onToggleSourceInList={toggleSourceInList}
-          onCreateSourceList={createSourceList}
-          onPromoteTag={(tag) => { setSidebarSelectedSource(null); /* promotion not supported from sidebar context */ }}
-          onTagClick={(tag) => { setSidebarSelectedSource(null); setSidebarTagPanel(tag) }}
-          onCreateCategory={createCategory}
-          onCreateIndustry={createIndustry}
-          onRenameSource={renameSource}
-          onClose={() => { setSidebarSelectedSource(null); setSourceOpenedFromPost(false) }}
-          topLayer={sourceOpenedFromPost}
-          allFeedPosts={allPosts}
-          savedLists={lists}
-          isRead={isRead}
-        />
-      )}
 
       {/* TagSourcesPanel opened from sidebar context */}
       {sidebarTagPanel && (
@@ -595,9 +636,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
                 archivePost(post, feedId, post.sourceId === 'manual')
                 if (post.sourceId === 'manual') removePost(post.id)
               }}
+              onOpenPost={(post) => openPostInline(post)}
               onOpenSource={(sourceId) => {
-                const source = [...staticSources, ...userSources].find((s) => s.id === sourceId)
-                if (source) { setSidebarSelectedSource(source); setSourceOpenedFromPost(true) }
+                openSidebarSource(sourceId)
+                setSourceOpenedFromPost(true)
               }}
             />
           ))}
@@ -619,5 +661,86 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         <p className="text-center text-xs text-black/25 py-4">You&apos;ve reached the end.</p>
       )}
     </div>
+
+    {/* Inline panels — sticky alongside feed */}
+    {openPost && (
+      <PostPanel
+        inline
+        post={openPost}
+        feedId={feedId}
+        onRead={() => markRead(openPost.id)}
+        onOpenSource={(sourceId) => {
+          openSidebarSource(sourceId)
+          setSourceOpenedFromPost(true)
+        }}
+        onNavigateToSpace={(spaceId) => {
+          try { if (openPost) sessionStorage.setItem('pendingOpenPost', JSON.stringify(openPost)) } catch {}
+          router.push(`/remix?space=${spaceId}`)
+        }}
+        onBack={panelHistory.length > 0 ? handlePanelBack : undefined}
+        onClose={handlePanelClose}
+      />
+    )}
+    {sidebarSelectedSource && (
+      <SourcePanel
+        inline
+        source={sidebarSelectedSource}
+        categories={categories}
+        industries={industries}
+        allTags={allTags}
+        sourceLists={sourceLists}
+        onSetCategory={setCategory}
+        onSetIndustry={setIndustry}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
+        onToggleSourceInList={toggleSourceInList}
+        onCreateSourceList={createSourceList}
+        onPromoteTag={() => openSidebarSource(null)}
+        onTagClick={(tag) => { openSidebarSource(null); setSidebarTagPanel(tag) }}
+        onCreateCategory={createCategory}
+        onCreateIndustry={createIndustry}
+        onRenameSource={renameSource}
+        onBack={panelHistory.length > 0 ? handlePanelBack : undefined}
+        onClose={() => { handlePanelClose() }}
+        allFeedPosts={allPosts}
+        savedLists={lists}
+        isRead={isRead}
+        onAddSourceCard={addSourceCard}
+        onRemoveSourceCard={removeSourceCard}
+        onNavigateToSpace={(spaceId) => router.push(`/remix?space=${spaceId}`)}
+        onOpenPiece={(post) => openPostInline(post)}
+      />
+    )}
+    {sourcesCardsPanelSource && !sourcesCardsOpen && (
+      <SourcePanel
+        inline
+        source={sourcesCardsPanelSource}
+        categories={categories}
+        industries={industries}
+        allTags={allTags}
+        sourceLists={sourceLists}
+        onSetCategory={setCategory}
+        onSetIndustry={setIndustry}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
+        onToggleSourceInList={toggleSourceInList}
+        onCreateSourceList={createSourceList}
+        onPromoteTag={() => openSourcesCardsPanel(null)}
+        onTagClick={(tag) => { openSourcesCardsPanel(null); setSidebarTagPanel(tag) }}
+        onCreateCategory={createCategory}
+        onCreateIndustry={createIndustry}
+        onRenameSource={renameSource}
+        onClose={() => openSourcesCardsPanel(null)}
+        allFeedPosts={allPosts}
+        savedLists={lists}
+        isRead={isRead}
+        onAddSourceCard={addSourceCard}
+        onRemoveSourceCard={removeSourceCard}
+        onNavigateToSpace={(spaceId) => router.push(`/remix?space=${spaceId}`)}
+        onOpenPiece={(post) => openPostInline(post)}
+      />
+    )}
+    </div>
+    </>
   )
 }

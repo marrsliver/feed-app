@@ -48,7 +48,7 @@ export function ListPickerDropdown({ post, onClose }: Props) {
       className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-white shadow-lg border border-black/15 py-1 text-sm"
     >
       {lists.length === 0 && !showInput && (
-        <p className="px-3 py-2 text-black/25 text-xs">No lists yet</p>
+        <p className="px-3 py-2 text-black/25 text-xs">No spaces yet</p>
       )}
       {lists.map((list) => {
         const checked = isInList(list.id, postId)
@@ -80,7 +80,7 @@ export function ListPickerDropdown({ post, onClose }: Props) {
                 if (e.key === 'Enter') handleCreate()
                 if (e.key === 'Escape') { setShowInput(false); setNewName('') }
               }}
-              placeholder="List name…"
+              placeholder="Space name…"
               className="flex-1 text-xs border border-black/15 px-2 py-1 outline-none focus:border-black/40 transition-colors"
             />
             <button
@@ -96,7 +96,7 @@ export function ListPickerDropdown({ post, onClose }: Props) {
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/5 text-black/40 hover:text-black transition-colors"
           >
             <Plus size={14} />
-            <span>New list</span>
+            <span>New space</span>
           </button>
         )}
       </div>

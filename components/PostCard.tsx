@@ -14,6 +14,8 @@ interface Props {
   onMove?: () => void
   onDelete?: () => void
   onOpenSource?: (sourceId: string) => void
+  onAddNoteToSpace?: (content: string) => void
+  onOpenPost?: (post: Post) => void
 }
 
 function formatDate(dateStr: string): string {
@@ -28,14 +30,14 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource }: Props) {
+export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
     <>
       <div className="break-inside-avoid mb-4">
         <div
-          onClick={() => setPanelOpen(true)}
+          onClick={() => onOpenPost ? onOpenPost(post) : setPanelOpen(true)}
           className="group block bg-white overflow-hidden transition-all duration-300 cursor-pointer"
           style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}
           onMouseEnter={(e) => {
@@ -63,12 +65,22 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpe
           <div className="p-4 space-y-2">
             {/* Source + bookmark */}
             <div className="flex items-center justify-between gap-2">
-              <span
-                className="text-[10px] font-semibold uppercase tracking-[0.12em]"
-                style={{ color: post.sourceColor }}
-              >
-                {post.sourceName}
-              </span>
+              {onOpenSource ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onOpenSource(post.sourceId) }}
+                  className="text-[10px] font-semibold uppercase tracking-[0.12em] hover:underline text-left"
+                  style={{ color: post.sourceColor }}
+                >
+                  {post.sourceName}
+                </button>
+              ) : (
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  style={{ color: post.sourceColor }}
+                >
+                  {post.sourceName}
+                </span>
+              )}
               <BookmarkButton post={post} />
             </div>
 
@@ -92,7 +104,7 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpe
         </div>
       </div>
 
-      {panelOpen && <PostPanel post={post} feedId={feedId} onRead={onRead} onMove={onMove} onDelete={onDelete} onOpenSource={onOpenSource} onClose={() => setPanelOpen(false)} />}
+      {!onOpenPost && panelOpen && <PostPanel post={post} feedId={feedId} onRead={onRead} onMove={onMove} onDelete={onDelete} onOpenSource={onOpenSource} onAddNoteToSpace={onAddNoteToSpace} onClose={() => setPanelOpen(false)} />}
     </>
   )
 }

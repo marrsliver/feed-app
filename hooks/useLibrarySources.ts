@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { LibrarySource } from '@/lib/types'
+import type { LibrarySource, SourceCard } from '@/lib/types'
 import { researchSources, musicSources } from '@/lib/sources.config'
 import { queueWrite, clearWrite } from '@/lib/pendingWrites'
 import { notifyPendingWritesChanged } from './usePendingWrites'
@@ -189,6 +189,25 @@ export function useLibrarySources() {
     })
   }, [updateSources])
 
+  const addSourceCard = useCallback((sourceId: string, card: SourceCard) => {
+    updateSources((prev) => prev.map((s) => {
+      if (s.id !== sourceId) return s
+      if ((s.cards ?? []).some(c => c.id === card.id)) return s // already exists
+      const cards = [...(s.cards ?? []), card]
+      persist(`/api/db/user-sources/${sourceId}`, 'PATCH', { cards })
+      return { ...s, cards }
+    }))
+  }, [updateSources])
+
+  const removeSourceCard = useCallback((sourceId: string, cardId: string) => {
+    updateSources((prev) => prev.map((s) => {
+      if (s.id !== sourceId) return s
+      const cards = (s.cards ?? []).filter((c) => c.id !== cardId)
+      persist(`/api/db/user-sources/${sourceId}`, 'PATCH', { cards })
+      return { ...s, cards }
+    }))
+  }, [updateSources])
+
   return {
     sources,
     staticSources,
@@ -203,5 +222,7 @@ export function useLibrarySources() {
     setIndustry,
     addTag,
     removeTag,
+    addSourceCard,
+    removeSourceCard,
   }
 }

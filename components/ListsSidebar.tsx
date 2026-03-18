@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { X, Plus, MoreHorizontal, Check } from 'lucide-react'
-import type { SavedList } from '@/lib/types'
+import type { Space } from '@/lib/types'
 
 interface Props {
-  lists: SavedList[]
+  lists: Space[]
   view: string
   onSetView: (id: string) => void
   onClose: () => void
@@ -21,7 +21,7 @@ function ListRow({
   onRename,
   onDelete,
 }: {
-  list: SavedList
+  list: Space
   active: boolean
   onSelect: () => void
   onRename: (id: string, name: string) => void
@@ -86,7 +86,7 @@ function ListRow({
       )}
 
       <span className={`text-xs shrink-0 ${active ? 'text-white/50' : 'text-black/30'}`}>
-        {list.postIds.length}
+        {list.items.length}
       </span>
 
       {/* ··· menu */}
@@ -150,7 +150,7 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
       <div className="fixed top-0 right-0 h-full w-72 z-50 bg-white shadow-xl flex flex-col animate-slide-right">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-black/10">
-          <h2 className="text-sm font-semibold text-black">My Lists</h2>
+          <h2 className="text-sm font-semibold text-black">My Spaces</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black"
@@ -202,7 +202,7 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
                   if (e.key === 'Enter') handleCreate()
                   if (e.key === 'Escape') { setShowInput(false); setNewName('') }
                 }}
-                placeholder="List name…"
+                placeholder="Space name…"
                 className="flex-1 text-sm border border-black/20 px-3 py-1.5 outline-none focus:border-black/50 transition-colors"
               />
               <button
@@ -218,7 +218,7 @@ export function ListsSidebar({ lists, view, onSetView, onClose, onCreate, onRena
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-black/50 hover:text-black hover:bg-black/5 transition-colors"
             >
               <Plus size={15} />
-              New list
+              New space
             </button>
           )}
         </div>

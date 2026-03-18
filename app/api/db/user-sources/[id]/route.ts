@@ -10,6 +10,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.industryId !== undefined) update.industry_id = body.industryId
   if (body.tags !== undefined) update.tags = body.tags
   if (body.name !== undefined) update.name = body.name
+  if (body.cards !== undefined) update.cards = body.cards
   const { error } = await getSupabase().from('user_sources').update(update).eq('id', id)
   if (error) { console.error(error); return NextResponse.json({ error: 'Database error' }, { status: 500 }) }
   return NextResponse.json({ ok: true })
