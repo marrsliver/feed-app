@@ -297,6 +297,7 @@ function PostItemWrapper({
   onAddNoteToSpace,
   onOpenPost,
   onConnectToSource,
+  onUnlinkSource,
 }: {
   item: SpaceItem
   sources: LibrarySource[]
@@ -305,14 +306,15 @@ function PostItemWrapper({
   onAddNoteToSpace: (content: string) => void
   onOpenPost: (post: Post) => void
   onConnectToSource?: () => void
+  onUnlinkSource?: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
   const post = item.postData!
 
   return (
     <div className="group relative">
-      {/* Remove confirm — bottom-left */}
-      <div className="absolute bottom-2 left-2 z-10">
+      {/* Remove from space — top-right */}
+      <div className="absolute top-2 right-2 z-10">
         {confirming ? (
           <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
             <span className="text-[10px] text-black/40">Remove?</span>
@@ -336,16 +338,40 @@ function PostItemWrapper({
         }}
         onAddNoteToSpace={onAddNoteToSpace}
       />
-      {onConnectToSource && (
-        <div className="px-4 pb-3 -mt-1">
+      <div className="px-4 pb-3 -mt-1 flex items-center gap-3">
+        {item.sourceRef && (() => {
+          const src = sources.find((s) => s.id === item.sourceRef)
+          if (!src) return null
+          return (
+            <span className="flex items-center gap-1">
+              <button
+                onClick={() => onOpenSource(src)}
+                className="flex items-center gap-1 text-[9px] text-black/50 hover:text-black transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: src.color }} />
+                {src.name}
+              </button>
+              {onUnlinkSource && (
+                <button
+                  onClick={onUnlinkSource}
+                  title="Unlink source"
+                  className="text-black/25 hover:text-black/60 transition-colors leading-none"
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          )
+        })()}
+        {onConnectToSource && (
           <button
             onClick={onConnectToSource}
             className="flex items-center gap-1 text-[9px] text-black/30 hover:text-black/60 transition-colors"
           >
-            <Database size={9} />Link to source
+            <Database size={9} />{item.sourceRef ? 'Change source' : 'Link to source'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -530,6 +556,7 @@ function SpaceWorkspace({
           onOpenPost={(post) => onOpenPostPanel(post, item)}
           onAddNoteToSpace={(content) => onAddNote(space.id, content, { postRef: item.postData, sourceRef: item.postData?.sourceId })}
           onConnectToSource={() => onConnectItemToSource(item)}
+          onUnlinkSource={item.sourceRef ? () => onUpdateItem(space.id, item.id, { sourceRef: undefined, cardRef: undefined }) : undefined}
         />
       )
     }
@@ -908,11 +935,12 @@ function RemixPageInner() {
       updates.commentId = newCommentId
     }
     updateItem(space.id, item.id, updates)
-    const title = item.type === 'note'
-      ? (item.content ?? 'Note').slice(0, 80)
-      : item.postData?.title ?? item.type
-    const url = item.postData?.url ?? item.postRef?.url ?? ''
-    addSourceCard(sourceId, { id: item.id, url, title, addedAt: item.addedAt })
+    // Notes go to Analysis Notes via addComment only — never create a Piece
+    if (item.type !== 'note') {
+      const title = item.postData?.title ?? item.type
+      const url = item.postData?.url ?? item.postRef?.url ?? ''
+      addSourceCard(sourceId, { id: item.id, url, title, addedAt: item.addedAt })
+    }
   }, [addComment, addSourceCard, removeSourceCard, updateItem])
 
   const searchParams = useSearchParams()

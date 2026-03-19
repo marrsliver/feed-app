@@ -161,7 +161,7 @@ export function AddLinkPanel({ feedId, onAdd, onClose }: Props) {
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-black text-white text-sm font-medium hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Plus size={14} />
-                Add to feed
+                Add to space
               </button>
             </div>
           )}
@@ -186,7 +186,7 @@ export function AddLinkPanel({ feedId, onAdd, onClose }: Props) {
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-black text-white text-sm font-medium hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Plus size={14} />
-                Add to feed
+                Add to space
               </button>
             </div>
           )}

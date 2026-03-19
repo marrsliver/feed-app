@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, FolderPlus, ExternalLink, FileText, Newspaper, Database, ChevronLeft } from 'lucide-react'
+import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, FolderPlus, ExternalLink, FileText, Newspaper, Database, ChevronLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
 import { useKnowledgeGraph } from '@/hooks/useKnowledgeGraph'
 import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, Space, SourceCard } from '@/lib/types'
@@ -173,6 +173,9 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   const [expandedPieceId, setExpandedPieceId] = useState<string | null>(null)
   const [addToSpacePickerOpen, setAddToSpacePickerOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [piecesOpen, setPiecesOpen] = useState(false)
+  const [inSpacesOpen, setInSpacesOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
   const newIndustryRef = useRef<HTMLInputElement>(null)
@@ -663,71 +666,83 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
           <div className="border-t border-black/10 mx-5" />
 
           {/* Notes */}
-          <div className="px-5 py-5 space-y-4">
-            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
-              Notes {comments.length > 0 && `(${comments.length})`}
-            </h3>
+          <div className="px-5 py-3">
+            <button
+              onClick={() => setNotesOpen(v => !v)}
+              className="w-full flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-black/40 hover:text-black/60 transition-colors py-2"
+            >
+              <span>Notes {comments.length > 0 && `(${comments.length})`}</span>
+              {notesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+            </button>
 
-            {comments.length > 0 && (
-              <div className="space-y-3">
-                {comments.map((c) => {
-                  const noteSpaceLinks = commentToSpaces
-                    ? (commentToSpaces[c.id] ?? [])
-                    : connections.notes
-                        .filter(({ item }) => item.commentId === c.id || item.content === c.text)
-                        .map(({ space }) => ({ id: space.id, name: space.name }))
-                        .filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i) // deduplicate
-                  return (
-                    <NoteRow
-                      key={c.id}
-                      text={c.text}
-                      createdAt={c.createdAt}
-                      onEdit={(text) => { editComment(source.id, c.id, text); onCommentEdited?.(c.id, text) }}
-                      onDelete={() => deleteComment(source.id, c.id)}
-                      onAddToSpace={onAddNoteToSpace ? (text) => onAddNoteToSpace(text, c.id) : undefined}
-                      spaceLinks={noteSpaceLinks.length > 0 ? noteSpaceLinks : undefined}
-                      onNavigateToSpace={onNavigateToSpace}
-                    />
-                  )
-                })}
+            {notesOpen && (
+              <div className="space-y-4 pb-2">
+                {comments.length > 0 && (
+                  <div className="space-y-3">
+                    {comments.map((c) => {
+                      const noteSpaceLinks = commentToSpaces
+                        ? (commentToSpaces[c.id] ?? [])
+                        : connections.notes
+                            .filter(({ item }) => item.commentId === c.id || item.content === c.text)
+                            .map(({ space }) => ({ id: space.id, name: space.name }))
+                            .filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i)
+                      return (
+                        <NoteRow
+                          key={c.id}
+                          text={c.text}
+                          createdAt={c.createdAt}
+                          onEdit={(text) => { editComment(source.id, c.id, text); onCommentEdited?.(c.id, text) }}
+                          onDelete={() => deleteComment(source.id, c.id)}
+                          onAddToSpace={onAddNoteToSpace ? (text) => onAddNoteToSpace(text, c.id) : undefined}
+                          spaceLinks={noteSpaceLinks.length > 0 ? noteSpaceLinks : undefined}
+                          onNavigateToSpace={onNavigateToSpace}
+                        />
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <textarea
+                    ref={textareaRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
+                    }}
+                    placeholder="Add a note…"
+                    rows={3}
+                    className="w-full text-sm border border-black/15 px-3 py-2.5 resize-none outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-black/25">⌘ + Enter to save</span>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!draft.trim()}
+                      className="px-3 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
-
-            <div className="space-y-2">
-              <textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
-                }}
-                placeholder="Add a note…"
-                rows={3}
-                className="w-full text-sm border border-black/15 px-3 py-2.5 resize-none outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-black/25">⌘ + Enter to save</span>
-                <button
-                  onClick={handleSubmit}
-                  disabled={!draft.trim()}
-                  className="px-3 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Pieces — manually-curated links pinned to this source */}
           {(onAddSourceCard || (source.cards ?? []).length > 0) && (
             <>
               <div className="border-t border-black/10 mx-5" />
-              <div className="px-5 py-5 space-y-4">
+              <div className="px-5 py-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                  <button
+                    onClick={() => setPiecesOpen(v => !v)}
+                    className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-black/40 hover:text-black/60 transition-colors py-2"
+                  >
+                    {piecesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                     Pieces {(source.cards ?? []).length > 0 && `(${(source.cards ?? []).length})`}
-                  </h3>
-                  {onAddSourceCard && !addingPiece && (
+                  </button>
+                  {piecesOpen && onAddSourceCard && !addingPiece && (
                     <button
                       onClick={() => { setAddingPiece(true); setTimeout(() => pieceUrlRef.current?.focus(), 10) }}
                       className="flex items-center gap-1 text-[10px] text-black/30 hover:text-black transition-colors"
@@ -737,7 +752,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                   )}
                 </div>
 
-                {addingPiece && (
+                {piecesOpen && addingPiece && (
                   <div className="space-y-2 border border-black/10 p-3 bg-black/[0.02]">
                     <input
                       ref={pieceUrlRef}
@@ -772,7 +787,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                   </div>
                 )}
 
-                {(source.cards ?? []).length > 0 && (
+                {piecesOpen && (source.cards ?? []).length > 0 && (
                   <div className="space-y-3">
                     {(source.cards ?? []).map((card) => (
                       <div key={card.id} className="group flex items-start gap-2">
@@ -849,8 +864,8 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                   </div>
                 )}
 
-                {(source.cards ?? []).length === 0 && !addingPiece && (
-                  <p className="text-[10px] text-black/25">No pieces yet. Add links to curate content for this source.</p>
+                {piecesOpen && (source.cards ?? []).length === 0 && !addingPiece && (
+                  <p className="text-[10px] text-black/25 pb-2">No pieces yet. Add links to curate content for this source.</p>
                 )}
               </div>
             </>
@@ -859,12 +874,16 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
           {/* In Spaces */}
           <>
             <div className="border-t border-black/10 mx-5" />
-            <div className="px-5 py-5 space-y-3">
+            <div className="px-5 py-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                <button
+                  onClick={() => setInSpacesOpen(v => !v)}
+                  className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-black/40 hover:text-black/60 transition-colors py-2"
+                >
+                  {inSpacesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                   In Spaces {totalConnections > 0 && `(${totalConnections})`}
-                </h3>
-                {onAddSourceToSpace && allSpaces && (
+                </button>
+                {inSpacesOpen && onAddSourceToSpace && allSpaces && (
                   <button
                     onClick={() => setAddToSpacePickerOpen(v => !v)}
                     className="text-[9px] text-black/30 hover:text-black transition-colors flex items-center gap-0.5"
@@ -873,61 +892,63 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                   </button>
                 )}
               </div>
-              {addToSpacePickerOpen && allSpaces && onAddSourceToSpace && (
-                <div className="border border-black/10 bg-white py-1">
-                  {allSpaces.map((s) => (
+
+              {inSpacesOpen && (
+                <div className="space-y-3 pb-2">
+                  {addToSpacePickerOpen && allSpaces && onAddSourceToSpace && (
+                    <div className="border border-black/10 bg-white py-1">
+                      {allSpaces.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => { onAddSourceToSpace(s.id); setAddToSpacePickerOpen(false) }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 transition-colors text-black/70"
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {totalConnections === 0 && (
+                    <p className="text-[10px] text-black/25">Not yet referenced in any space.</p>
+                  )}
+
+                  {totalConnections > 0 && (() => {
+                    const seenIds = new Set<string>()
+                    const uniqueSpaces: { id: string; name: string }[] = []
+                    for (const { space } of [...connections.notes, ...connections.posts, ...connections.sourceItems]) {
+                      if (!seenIds.has(space.id)) {
+                        seenIds.add(space.id)
+                        uniqueSpaces.push({ id: space.id, name: space.name })
+                      }
+                    }
+                    return (
+                      <div className="space-y-1">
+                        {uniqueSpaces.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => onNavigateToSpace ? onNavigateToSpace(s.id) : (window.location.href = `/remix?space=${s.id}`)}
+                            className="flex items-center gap-1.5 text-xs text-black/60 hover:text-black transition-colors w-full text-left"
+                          >
+                            <span className="w-1 h-1 rounded-full bg-black/20 shrink-0" />
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })()}
+
+                  {totalConnections > 0 && (
                     <button
-                      key={s.id}
-                      onClick={() => { onAddSourceToSpace(s.id); setAddToSpacePickerOpen(false) }}
-                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 transition-colors text-black/70"
+                      onClick={() => setDetailsOpen(v => !v)}
+                      className="text-[9px] text-black/30 hover:text-black transition-colors flex items-center gap-1 mt-1"
                     >
-                      {s.name}
+                      {detailsOpen ? '▾' : '▸'} Connection details
                     </button>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {totalConnections === 0 && (
-                <p className="text-[10px] text-black/25">Not yet referenced in any space.</p>
-              )}
-
-              {totalConnections > 0 && (() => {
-                // Deduplicate spaces
-                const seenIds = new Set<string>()
-                const uniqueSpaces: { id: string; name: string }[] = []
-                for (const { space } of [...connections.notes, ...connections.posts, ...connections.sourceItems]) {
-                  if (!seenIds.has(space.id)) {
-                    seenIds.add(space.id)
-                    uniqueSpaces.push({ id: space.id, name: space.name })
-                  }
-                }
-                return (
-                  <div className="space-y-1">
-                    {uniqueSpaces.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => onNavigateToSpace ? onNavigateToSpace(s.id) : (window.location.href = `/remix?space=${s.id}`)}
-                        className="flex items-center gap-1.5 text-xs text-black/60 hover:text-black transition-colors w-full text-left"
-                      >
-                        <span className="w-1 h-1 rounded-full bg-black/20 shrink-0" />
-                        {s.name}
-                      </button>
-                    ))}
-                  </div>
-                )
-              })()}
-
-              {totalConnections > 0 && (
-                <button
-                  onClick={() => setDetailsOpen(v => !v)}
-                  className="text-[9px] text-black/30 hover:text-black transition-colors flex items-center gap-1 mt-1"
-                >
-                  {detailsOpen ? '▾' : '▸'} Connection details
-                </button>
-              )}
-
-              {detailsOpen && (
-                <div className="space-y-3 pt-1 border-t border-black/8">
+                  {detailsOpen && (
+                    <div className="space-y-3 pt-1 border-t border-black/8">
                   {connections.notes.length > 0 && (
                     <div className="space-y-1.5">
                       <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-black/30 flex items-center gap-1"><FileText size={9} />Notes</p>
@@ -1015,6 +1036,8 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                       ))}
                     </div>
                   )}
+                </div>
+              )}
                 </div>
               )}
             </div>
