@@ -6,10 +6,9 @@ import { usePendingWrites } from '@/hooks/usePendingWrites'
 interface Props {
   activeFeed: 'research' | 'remix'
   sourcesCount?: number
-  onShowSources?: () => void
 }
 
-export function Header({ activeFeed, sourcesCount, onShowSources }: Props) {
+export function Header({ activeFeed, sourcesCount }: Props) {
   const { pendingCount, retrying, retry, dismissAll } = usePendingWrites()
 
   return (
@@ -17,21 +16,6 @@ export function Header({ activeFeed, sourcesCount, onShowSources }: Props) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-end justify-between">
         {/* Tabs */}
         <div className="flex items-stretch gap-0">
-          {onShowSources ? (
-            <button
-              onClick={onShowSources}
-              className="px-4 py-2 font-display text-sm font-semibold tracking-tight transition-colors bg-white text-black/40 hover:text-black"
-            >
-              Sources
-            </button>
-          ) : (
-            <Link
-              href="/"
-              className="px-4 py-2 font-display text-sm font-semibold tracking-tight transition-colors bg-white text-black/40 hover:text-black"
-            >
-              Sources
-            </Link>
-          )}
           <Link
             href="/"
             className={`px-4 py-2 font-display text-sm font-semibold tracking-tight transition-colors ${

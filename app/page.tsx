@@ -14,7 +14,6 @@ export default function Home() {
       <Header
         activeFeed="research"
         sourcesCount={sources.length}
-        onShowSources={() => setSourcesCardsTick(t => t + 1)}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Feed

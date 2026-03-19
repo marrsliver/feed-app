@@ -176,6 +176,7 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
   const [creatingIndustry, setCreatingIndustry] = useState(false)
   const [newIndustryName, setNewIndustryName] = useState('')
   const [tab, setTab] = useState<TabView>('library')
+  const [searchQuery, setSearchQuery] = useState('')
   const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
   function toggleIndustry(id: string) {
     setExpandedIndustries(prev => {
@@ -362,6 +363,13 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
     { id: 'list', label: 'Library Only' },
   ]
 
+  const q = searchQuery.trim().toLowerCase()
+  const searchFiltered = q
+    ? (tab === 'feed' ? feedList : tab === 'list' ? listOnlyList : [...allLibraryStatic, ...allUser])
+        .filter((s) => s.name.toLowerCase().includes(q))
+        .sort(byName)
+    : null
+
   const isLoading = detect.status === 'loading' || detect.status === 'categorizing'
 
   return (
@@ -400,6 +408,16 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
               {label}
             </button>
           ))}
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-2 border-b border-black/10 shrink-0">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search sources…"
+            className="w-full text-xs border border-black/15 px-2.5 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+          />
         </div>
 
         {/* Add source */}
@@ -569,7 +587,17 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
 
         {/* Source list */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-          {tab === 'library' ? (
+          {searchFiltered ? (
+            searchFiltered.length === 0 ? (
+              <p className="text-center py-10 text-black/25 text-xs">No sources match &ldquo;{searchQuery}&rdquo;.</p>
+            ) : (
+              <div className="space-y-0.5">
+                {searchFiltered.map((s) => (
+                  <SourceRow key={s.id} s={s} onToggleFeed={onToggleFeed} onRemoveSource={onRemoveSource} onRenameSource={onRenameSource} onOpenSource={onOpenSource} showKind={true} />
+                ))}
+              </div>
+            )
+          ) : tab === 'library' ? (
             allLibrary.length === 0 ? (
               <p className="text-center py-10 text-black/25 text-xs">No sources yet.</p>
             ) : (
@@ -709,3 +737,4 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
     </>
   )
 }
+
