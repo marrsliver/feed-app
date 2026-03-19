@@ -1,4 +1,5 @@
 -- Run this once in the Supabase SQL editor: https://supabase.com/dashboard/project/pprlbhcdyynaqjuvcdpf/sql
+-- After the initial setup, also run the ALTER TABLE statements at the bottom of this file.
 
 create table if not exists comments (
   id text primary key,
@@ -43,3 +44,18 @@ create table if not exists deleted_posts (
   deleted_at bigint not null
 );
 alter table deleted_posts disable row level security;
+
+-- Columns added after initial setup (run these if they don't exist yet):
+alter table user_sources add column if not exists type text not null default 'rss';
+alter table user_sources add column if not exists api_path text;
+alter table user_sources add column if not exists is_static boolean not null default false;
+alter table user_sources add column if not exists feed_group text;
+alter table user_sources add column if not exists category_id text;
+alter table user_sources add column if not exists industry_id text;
+alter table user_sources add column if not exists tags text[] not null default '{}';
+alter table user_sources add column if not exists cards jsonb not null default '[]';
+
+alter table saved_lists add column if not exists post_data jsonb not null default '{}';
+alter table saved_lists add column if not exists description text;
+alter table saved_lists add column if not exists items jsonb not null default '[]';
+alter table saved_lists add column if not exists updated_at bigint;
