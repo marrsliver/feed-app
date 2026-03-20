@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, Plus, Trash2, Loader2, Rss, BookOpen, ExternalLink, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
 import type { LibrarySource, SourceCategory, SourceIndustry } from '@/lib/types'
 
@@ -166,6 +167,7 @@ function SourceRow({
 }
 
 export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated, hideBackdrop, onCreateCategory, onCreateIndustry }: Props) {
+  const router = useRouter()
   const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
   const [detect, setDetect] = useState<DetectState>({ status: 'idle' })
@@ -412,10 +414,10 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
           <h2 className="text-sm font-semibold text-black">Sources</h2>
           <div className="flex items-center gap-1">
             <button
-              onClick={onShowCards}
+              onClick={() => { router.push('/source-spaces'); onClose() }}
               className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-black/30 hover:text-black border border-black/10 hover:border-black/30 transition-colors"
             >
-              Show as cards
+              Show as Spaces
             </button>
             <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
               <X size={16} />

@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, useCallback, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Plus, MoreHorizontal, Check, FileText, Link2, Database, Layers, Search, Loader2, GripVertical, Image as ImageIcon, X, MoveRight, Copy, Tag, ArrowDownUp, Trash2, RotateCcw, Pencil, Minus, FolderOpen, Folder, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, MoreHorizontal, Check, FileText, Link2, Database, Layers, Search, Loader2, GripVertical, Image as ImageIcon, X, MoveRight, Copy, Tag, ArrowDownUp, Trash2, RotateCcw, Pencil, Minus, FolderOpen, Folder, ChevronRight, ChevronDown, GitBranch } from 'lucide-react'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { AddLinkPanel } from '@/components/AddLinkPanel'
@@ -26,6 +26,7 @@ import { useLibrarySources } from '@/hooks/useLibrarySources'
 import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useSourceIndustries } from '@/hooks/useSourceIndustries'
 import { useComments } from '@/hooks/useComments'
+import { useSourceItems } from '@/hooks/useSourceItems'
 import { pushUndo } from '@/lib/undoStack'
 import type { Space, SpaceItem, SpaceItemVersion, Post, LibrarySource, SpaceFolder } from '@/lib/types'
 
@@ -240,7 +241,7 @@ function SortableRow({ id, children }: {
 // ── SpaceRow (left panel) ────────────────────────────────────────────────────
 
 function SpaceRow({
-  space, active, onSelect, onRename, onDelete, folders, onMoveToFolder, onRemoveFromFolder, currentFolderId, dragListeners,
+  space, active, onSelect, onRename, onDelete, folders, onMoveToFolder, onRemoveFromFolder, currentFolderId, dragListeners, onConvertToSource,
 }: {
   space: Space; active: boolean
   onSelect: () => void; onRename: (id: string, name: string) => void; onDelete: (id: string) => void
@@ -249,6 +250,7 @@ function SpaceRow({
   onRemoveFromFolder: () => void
   currentFolderId: string | null
   dragListeners?: React.HTMLAttributes<HTMLElement>
+  onConvertToSource?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuMode, setMenuMode] = useState<'main' | 'folder'>('main')
@@ -322,6 +324,11 @@ function SpaceRow({
                 {currentFolderId && (
                   <button onClick={() => { setMenuOpen(false); onRemoveFromFolder() }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-black/50">Remove from folder</button>
                 )}
+                {onConvertToSource && (
+                  <button onClick={() => { setMenuOpen(false); onConvertToSource() }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-black/5 transition-colors text-black/60">
+                    <GitBranch size={11} />Convert to Source
+                  </button>
+                )}
                 <button onClick={() => { setMenuOpen(false); onDelete(space.id) }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-red-500">Delete</button>
               </>
             ) : (
@@ -349,7 +356,7 @@ function SpaceRow({
 
 function FolderRow({
   folder, spaces, activeSpaceId, onSelectSpace, onRenameSpace, onDeleteSpace, onRenameFolder, onDeleteFolder,
-  onDeleteFolderWithContents, allFolders, onMoveToFolder, onRemoveFromFolder, getFolderForSpace, autoRename, dragListeners,
+  onDeleteFolderWithContents, allFolders, onMoveToFolder, onRemoveFromFolder, getFolderForSpace, autoRename, dragListeners, onConvertToSource,
 }: {
   folder: SpaceFolder
   spaces: Space[]
@@ -366,6 +373,7 @@ function FolderRow({
   getFolderForSpace: (spaceId: string) => string | null
   autoRename?: boolean
   dragListeners?: React.HTMLAttributes<HTMLElement>
+  onConvertToSource?: (spaceId: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const [renaming, setRenaming] = useState(false)
@@ -459,6 +467,7 @@ function FolderRow({
             onMoveToFolder={(folderId) => onMoveToFolder(space.id, folderId)}
             onRemoveFromFolder={() => onRemoveFromFolder(space.id)}
             currentFolderId={getFolderForSpace(space.id)}
+            onConvertToSource={onConvertToSource ? () => onConvertToSource(space.id) : undefined}
           />
         </div>
       ))}
@@ -1602,6 +1611,7 @@ function TrashBin({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 function RemixPageInner() {
+  const router = useRouter()
   const {
     spaces, loaded, createSpace, deleteSpace, restoreSpace, permanentDeleteSpace, trashedSpaces,
     renameSpace, updateDescription, addPost, addNote, addSource, addMedia,
@@ -1622,7 +1632,20 @@ function RemixPageInner() {
   }
   const [newFolderId, setNewFolderId] = useState<string | null>(null)
   useEffect(() => { if (newFolderId) { const t = setTimeout(() => setNewFolderId(null), 500); return () => clearTimeout(t) } }, [newFolderId])
-  const { sources, setCategory, setIndustry, addTag, removeTag, renameSource, allTags, addSourceCard, removeSourceCard, addAssociation, removeAssociation } = useLibrarySources()
+  const { sources, setCategory, setIndustry, addTag, removeTag, renameSource, allTags, addSourceCard, removeSourceCard, addAssociation, removeAssociation, addSource: addLibrarySource } = useLibrarySources()
+  const { appendItem: appendSourceItem } = useSourceItems()
+
+  function convertSpaceToSource(spaceId: string) {
+    const space = spaces.find(s => s.id === spaceId)
+    if (!space) return
+    const newId = `user-${Date.now()}`
+    addLibrarySource({ id: newId, name: space.name, url: '', feedUrl: '', type: 'rss', inFeed: false, feedGroup: 'user' })
+    for (const item of space.items) {
+      appendSourceItem(newId, { ...item, addedAt: Date.now() })
+    }
+    deleteSpace(spaceId)
+    router.push(`/source-spaces?source=${newId}`)
+  }
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
   const { addComment } = useComments()
@@ -1972,6 +1995,7 @@ function RemixPageInner() {
                   onMoveToFolder={(folderId) => addSpaceToFolder(folderId, space.id)}
                   onRemoveFromFolder={() => removeSpaceFromFolder(getFolderForSpace(space.id) ?? '', space.id)}
                   currentFolderId={getFolderForSpace(space.id)}
+                  onConvertToSource={() => convertSpaceToSource(space.id)}
                 />
               ))
             ) : (() => {
@@ -2008,6 +2032,7 @@ function RemixPageInner() {
                                 getFolderForSpace={getFolderForSpace}
                                 autoRename={newFolderId === folder.id}
                                 dragListeners={listeners}
+                                onConvertToSource={convertSpaceToSource}
                               />
                             )}
                           </SortableRow>
@@ -2030,6 +2055,7 @@ function RemixPageInner() {
                               onRemoveFromFolder={() => removeSpaceFromFolder(getFolderForSpace(space.id) ?? '', space.id)}
                               currentFolderId={null}
                               dragListeners={listeners}
+                              onConvertToSource={() => convertSpaceToSource(space.id)}
                             />
                           )}
                         </SortableRow>
