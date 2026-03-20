@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Plus, MoreHorizontal, Check, FileText, Link2, Database, Layers, Search, Loader2, GripVertical, Image as ImageIcon, X, MoveRight, Copy, Tag, ArrowDownUp, Trash2, RotateCcw } from 'lucide-react'
+import { Plus, MoreHorizontal, Check, FileText, Link2, Database, Layers, Search, Loader2, GripVertical, Image as ImageIcon, X, MoveRight, Copy, Tag, ArrowDownUp, Trash2, RotateCcw, Pencil, Minus, FolderOpen, Folder, ChevronRight, ChevronDown } from 'lucide-react'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { AddLinkPanel } from '@/components/AddLinkPanel'
@@ -20,11 +20,14 @@ import { SourcePickerModal } from '@/components/SourcePickerModal'
 import { SourcePanel } from '@/components/SourcePanel'
 import { PostPanel } from '@/components/PostPanel'
 import { useSpaces } from '@/hooks/useSpaces'
+import { useSpaceFolders } from '@/hooks/useSpaceFolders'
+import type { SidebarEntry } from '@/hooks/useSpaceFolders'
 import { useLibrarySources } from '@/hooks/useLibrarySources'
 import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useSourceIndustries } from '@/hooks/useSourceIndustries'
 import { useComments } from '@/hooks/useComments'
-import type { Space, SpaceItem, Post, LibrarySource } from '@/lib/types'
+import { pushUndo } from '@/lib/undoStack'
+import type { Space, SpaceItem, SpaceItemVersion, Post, LibrarySource, SpaceFolder } from '@/lib/types'
 
 // ── Appears-in badge ──────────────────────────────────────────────────────────
 
@@ -173,13 +176,13 @@ function SortableItem({
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0 : 1,
-    gridColumn: `span ${item.itemSpan ?? 1}`,
+    gridColumn: item.type === 'divider' ? '1 / -1' : `span ${item.itemSpan ?? 1}`,
     gridRowEnd: rowSpan ? `span ${rowSpan}` : undefined,
     willChange: isDragging ? 'auto' : undefined,
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group">
+    <div ref={setNodeRef} style={style} className="relative group" data-space-item="true">
       {/* Card content — relative so absolute controls are anchored to it */}
       <div
         ref={contentRef}
@@ -212,22 +215,50 @@ function SortableItem({
   )
 }
 
+// ── SortableRow — generic sortable wrapper for sidebar items ─────────────────
+
+function SortableRow({ id, children }: {
+  id: string
+  children: (isDragging: boolean, listeners: React.HTMLAttributes<HTMLElement>) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition: isDragging ? 'none' : transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      {children(isDragging, listeners ?? {})}
+    </div>
+  )
+}
+
 // ── SpaceRow (left panel) ────────────────────────────────────────────────────
 
 function SpaceRow({
-  space, active, onSelect, onRename, onDelete,
+  space, active, onSelect, onRename, onDelete, folders, onMoveToFolder, onRemoveFromFolder, currentFolderId, dragListeners,
 }: {
   space: Space; active: boolean
   onSelect: () => void; onRename: (id: string, name: string) => void; onDelete: (id: string) => void
+  folders: SpaceFolder[]
+  onMoveToFolder: (folderId: string) => void
+  onRemoveFromFolder: () => void
+  currentFolderId: string | null
+  dragListeners?: React.HTMLAttributes<HTMLElement>
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuMode, setMenuMode] = useState<'main' | 'folder'>('main')
   const [renaming, setRenaming] = useState(false)
   const [draft, setDraft] = useState(space.name)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen) { setMenuMode('main'); return }
     function h(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
@@ -244,9 +275,10 @@ function SpaceRow({
 
   return (
     <div
-      className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${active ? 'bg-black text-white' : 'hover:bg-black/5 text-black'}`}
+      className={`group flex items-center gap-2 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors ${active ? 'bg-black text-white' : 'hover:bg-black/5 text-black'}`}
       onClick={onSelect}
       onDoubleClick={() => setRenaming(true)}
+      {...dragListeners}
     >
       <div className={`w-3.5 h-3.5 border flex items-center justify-center shrink-0 ${active ? 'bg-white border-white' : 'border-black/20'}`}>
         {active && <Check size={9} className="text-black" strokeWidth={3} />}
@@ -277,11 +309,465 @@ function SpaceRow({
           <MoreHorizontal size={13} />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-black/15 shadow-md text-xs py-0.5 min-w-[110px]">
-            <button onClick={() => { setMenuOpen(false); setRenaming(true) }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-black">Rename</button>
-            <button onClick={() => { setMenuOpen(false); onDelete(space.id) }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-red-500">Delete</button>
+          <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-black/15 shadow-md text-xs py-0.5 min-w-[130px]">
+            {menuMode === 'main' ? (
+              <>
+                <button onClick={() => { setMenuOpen(false); setRenaming(true) }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-black">Rename</button>
+                {folders.length > 0 && (
+                  <button onClick={() => setMenuMode('folder')} className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/5 transition-colors text-black">
+                    <span>{currentFolderId ? 'Move folder' : 'Add to folder'}</span>
+                    <ChevronRight size={10} className="text-black/30" />
+                  </button>
+                )}
+                {currentFolderId && (
+                  <button onClick={() => { setMenuOpen(false); onRemoveFromFolder() }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-black/50">Remove from folder</button>
+                )}
+                <button onClick={() => { setMenuOpen(false); onDelete(space.id) }} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-red-500">Delete</button>
+              </>
+            ) : (
+              <>
+                <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-black/30 font-semibold border-b border-black/8">Move to folder</div>
+                {folders.map(f => (
+                  <button key={f.id} onClick={() => { setMenuOpen(false); onMoveToFolder(f.id) }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-black/5 transition-colors ${f.id === currentFolderId ? 'text-black font-medium' : 'text-black/70'}`}>
+                    <Folder size={10} className="text-black/30 shrink-0" />
+                    <span className="truncate">{f.name}</span>
+                    {f.id === currentFolderId && <Check size={9} className="shrink-0 ml-auto" />}
+                  </button>
+                ))}
+                <button onClick={() => setMenuMode('main')} className="w-full text-left px-3 py-2 hover:bg-black/5 transition-colors text-black/40 border-t border-black/8">← Back</button>
+              </>
+            )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── FolderRow ────────────────────────────────────────────────────────────────
+
+function FolderRow({
+  folder, spaces, activeSpaceId, onSelectSpace, onRenameSpace, onDeleteSpace, onRenameFolder, onDeleteFolder,
+  onDeleteFolderWithContents, allFolders, onMoveToFolder, onRemoveFromFolder, getFolderForSpace, autoRename, dragListeners,
+}: {
+  folder: SpaceFolder
+  spaces: Space[]
+  activeSpaceId: string | null
+  onSelectSpace: (id: string) => void
+  onRenameSpace: (id: string, name: string) => void
+  onDeleteSpace: (id: string) => void
+  onRenameFolder: (id: string, name: string) => void
+  onDeleteFolder: (id: string) => void
+  onDeleteFolderWithContents: (id: string) => void
+  allFolders: SpaceFolder[]
+  onMoveToFolder: (spaceId: string, folderId: string) => void
+  onRemoveFromFolder: (spaceId: string) => void
+  getFolderForSpace: (spaceId: string) => string | null
+  autoRename?: boolean
+  dragListeners?: React.HTMLAttributes<HTMLElement>
+}) {
+  const [open, setOpen] = useState(true)
+  const [renaming, setRenaming] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<null | 'folder' | 'contents'>(null)
+  const [draft, setDraft] = useState(folder.name)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) { setConfirmDelete(null); return }
+    function h(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [menuOpen])
+
+  useEffect(() => { if (autoRename) setRenaming(true) }, [autoRename])
+  useEffect(() => { if (renaming) inputRef.current?.focus() }, [renaming])
+
+  function commitRename() {
+    const t = draft.trim()
+    if (t && t !== folder.name) onRenameFolder(folder.id, t)
+    else setDraft(folder.name)
+    setRenaming(false)
+  }
+
+  return (
+    <div>
+      {/* Folder header — entire row is draggable */}
+      <div className="group flex items-center gap-1.5 px-3 py-2 hover:bg-black/3 transition-colors cursor-grab active:cursor-grabbing" {...dragListeners}>
+        <button onClick={() => setOpen(p => !p)} className="flex items-center gap-1.5 flex-1 min-w-0" onPointerDown={(e) => e.stopPropagation()}>
+          {open ? <ChevronDown size={11} className="text-black/30 shrink-0" /> : <ChevronRight size={11} className="text-black/30 shrink-0" />}
+          {open ? <FolderOpen size={12} className="text-black/40 shrink-0" /> : <Folder size={12} className="text-black/40 shrink-0" />}
+          {renaming ? (
+            <input ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setDraft(folder.name); setRenaming(false) } }}
+              onBlur={commitRename} onClick={(e) => e.stopPropagation()}
+              className="flex-1 text-xs border border-black/30 px-1 py-0.5 outline-none focus:border-black/50 bg-white text-black"
+            />
+          ) : (
+            <span className="text-xs font-medium text-black/60 truncate">{folder.name}</span>
+          )}
+          <span className="text-[9px] text-black/25 ml-auto shrink-0 pr-1">{spaces.length}</span>
+        </button>
+        <div ref={menuRef} className="relative shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+          <button onClick={() => setMenuOpen(p => !p)} className="opacity-0 group-hover:opacity-100 p-0.5 text-black/30 hover:text-black transition-colors">
+            <MoreHorizontal size={12} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-black/15 shadow-md text-xs py-0.5 min-w-[170px]">
+              <button onClick={() => { setMenuOpen(false); setRenaming(true) }} className="w-full text-left px-3 py-2 hover:bg-black/5 text-black">Rename</button>
+              {confirmDelete === 'folder' ? (
+                <div className="px-3 py-2 border-t border-black/8 space-y-1.5">
+                  <p className="text-[10px] text-black/50">Delete folder? Spaces inside will be kept.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { onDeleteFolder(folder.id); setMenuOpen(false) }} className="text-[10px] text-red-500 font-medium">Yes, delete</button>
+                    <button onClick={() => setConfirmDelete(null)} className="text-[10px] text-black/40">Cancel</button>
+                  </div>
+                </div>
+              ) : confirmDelete === 'contents' ? (
+                <div className="px-3 py-2 border-t border-black/8 space-y-1.5">
+                  <p className="text-[10px] text-black/50">Delete folder and all {spaces.length} space{spaces.length !== 1 ? 's' : ''} inside?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { onDeleteFolderWithContents(folder.id); setMenuOpen(false) }} className="text-[10px] text-red-500 font-medium">Yes, delete all</button>
+                    <button onClick={() => setConfirmDelete(null)} className="text-[10px] text-black/40">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-black/8">
+                  <button onClick={() => setConfirmDelete('folder')} className="w-full text-left px-3 py-2 hover:bg-black/5 text-red-500">Delete folder</button>
+                  {spaces.length > 0 && (
+                    <button onClick={() => setConfirmDelete('contents')} className="w-full text-left px-3 py-2 hover:bg-black/5 text-red-500">Delete folder + contents</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Spaces in this folder */}
+      {open && spaces.map((space) => (
+        <div key={space.id} className="pl-5">
+          <SpaceRow
+            space={space}
+            active={activeSpaceId === space.id}
+            onSelect={() => onSelectSpace(space.id)}
+            onRename={onRenameSpace}
+            onDelete={onDeleteSpace}
+            folders={allFolders}
+            onMoveToFolder={(folderId) => onMoveToFolder(space.id, folderId)}
+            onRemoveFromFolder={() => onRemoveFromFolder(space.id)}
+            currentFolderId={getFolderForSpace(space.id)}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── AttachedNoteRow — editable note inside a merged card ─────────────────────
+
+function AttachedNoteRow({ note, onRemove, onDelete, onUpdate }: {
+  note: SpaceItem
+  onRemove: () => void
+  onDelete?: () => void
+  onUpdate: (updates: Partial<SpaceItem>) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(note.content ?? '')
+  const [confirming, setConfirming] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => { if (editing) textareaRef.current?.focus() }, [editing])
+  useEffect(() => { if (!editing) setDraft(note.content ?? '') }, [note.content, editing])
+
+  function save() {
+    const t = draft.trim()
+    if (!t || t === note.content) { setEditing(false); return }
+    const newVersion: SpaceItemVersion = { content: note.content ?? '', editedAt: Date.now() }
+    onUpdate({ content: t, versions: [newVersion, ...(note.versions ?? [])] })
+    setEditing(false)
+  }
+
+  return (
+    <div className="border-t border-amber-200/60 px-4 py-3 bg-amber-50/50 group/note">
+      <div className="flex items-start gap-2">
+        <FileText size={11} className="text-amber-400/60 mt-0.5 shrink-0" />
+        {editing ? (
+          <div className="flex-1 space-y-2">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
+                if (e.key === 'Escape') { setDraft(note.content ?? ''); setEditing(false) }
+              }}
+              rows={3}
+              className="w-full text-sm border border-amber-200 px-2 py-1.5 resize-none outline-none focus:border-amber-400 transition-colors bg-white/70 leading-relaxed"
+            />
+            <div className="flex gap-2">
+              <button onClick={save} className="text-xs bg-black text-white px-3 py-1 hover:bg-black/80 transition-colors">Save</button>
+              <button onClick={() => { setDraft(note.content ?? ''); setEditing(false) }} className="text-xs text-black/40 hover:text-black px-2 py-1 transition-colors">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-black/80 leading-relaxed flex-1 whitespace-pre-wrap cursor-text" onClick={() => setEditing(true)}>
+            {note.content}
+          </p>
+        )}
+        {!editing && (
+          confirming ? (
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button onClick={() => { onRemove(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+              {onDelete && <button onClick={() => { onDelete(); setConfirming(false) }} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1 transition-colors">Delete</button>}
+              <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
+            </div>
+          ) : (
+            <div className="flex gap-0.5 opacity-0 group-hover/note:opacity-100 transition-opacity shrink-0">
+              <button onClick={() => setEditing(true)} className="p-0.5 text-black/25 hover:text-black transition-colors"><Pencil size={11} /></button>
+              <button onClick={() => setConfirming(true)} className="p-0.5 text-black/25 hover:text-black transition-colors"><X size={11} /></button>
+            </div>
+          )
+        )}
+      </div>
+      <p className="text-[9px] text-black/25 mt-1.5 ml-[19px] uppercase tracking-widest">
+        {new Date(note.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+      </p>
+    </div>
+  )
+}
+
+// ── MergedArticleNoteCard — article + attached notes in one box ───────────────
+
+function MergedArticleNoteCard({ item, attachedNotes, sources, onRemovePost, onDeletePost, onRemoveNote, onUpdateNote, onOpenPost, onOpenSource, onConnectToSource, onUnlinkSource }: {
+  item: SpaceItem
+  attachedNotes: SpaceItem[]
+  sources: LibrarySource[]
+  onRemovePost: () => void
+  onDeletePost?: () => void
+  onRemoveNote: (noteId: string) => void
+  onUpdateNote: (noteId: string, updates: Partial<SpaceItem>) => void
+  onOpenPost: (post: Post) => void
+  onOpenSource: (s: LibrarySource) => void
+  onConnectToSource: () => void
+  onUnlinkSource?: () => void
+}) {
+  const [confirming, setConfirming] = useState(false)
+  const post = item.postData!
+
+  const explicitSrc = item.sourceRef ? sources.find((s) => s.id === item.sourceRef) : null
+  const derivedSrc = !item.sourceRef && post.sourceId && post.sourceId !== 'manual'
+    ? (sources.find((s) => s.id === post.sourceId) ?? { id: post.sourceId, name: post.sourceName, color: post.sourceColor })
+    : null
+  const displaySrc = explicitSrc ?? derivedSrc
+
+  return (
+    <div className="group relative bg-white" style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.07)' }}>
+      {/* Remove post — top right */}
+      <div className="absolute top-2 right-2 z-10">
+        {confirming ? (
+          <div className="flex items-center gap-0.5 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
+            <button onClick={() => { onRemovePost(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+            {onDeletePost && <button onClick={() => { onDeletePost(); setConfirming(false) }} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1 transition-colors">Delete</button>}
+            <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirming(true)} className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm p-0.5 text-black/30 hover:text-black">
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      {/* Article */}
+      <div className="p-4 cursor-pointer" onClick={() => onOpenPost(post)}>
+        {post.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={post.image} alt={post.title} className="w-full object-cover max-h-36 mb-3 -mx-0" />
+        )}
+        <h3 className="text-sm font-semibold text-black leading-snug pr-5">{post.title}</h3>
+        {post.excerpt && (
+          <p className="text-xs text-black/50 mt-1.5 leading-relaxed line-clamp-2">{post.excerpt}</p>
+        )}
+        <p className="text-[9px] text-black/30 mt-2 uppercase tracking-widest">
+          {new Date(post.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </p>
+      </div>
+
+      {/* Attached notes */}
+      {attachedNotes.map((note) => (
+        <AttachedNoteRow
+          key={note.id}
+          note={note}
+          onRemove={() => onRemoveNote(note.id)}
+          onUpdate={(updates) => onUpdateNote(note.id, updates)}
+        />
+      ))}
+
+      {/* Footer: source link */}
+      <div className="px-4 pb-3 pt-2 flex items-center gap-3">
+        {displaySrc && (
+          <span className="flex items-center gap-1">
+            <button
+              onClick={() => { const src = sources.find((s) => s.id === displaySrc.id); if (src) onOpenSource(src) }}
+              className="flex items-center gap-1 text-[9px] text-black/50 hover:text-black transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: displaySrc.color }} />
+              {displaySrc.name}
+            </button>
+            {onUnlinkSource && item.sourceRef && (
+              <button onClick={onUnlinkSource} title="Unlink source" className="text-black/25 hover:text-black/60 transition-colors leading-none">×</button>
+            )}
+          </span>
+        )}
+        <button
+          onClick={onConnectToSource}
+          className="flex items-center gap-1 text-[9px] text-black/30 hover:text-black/60 transition-colors"
+        >
+          <Database size={9} />{displaySrc ? 'Change source' : 'Link to source'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── TextItemCard — floating canvas text (no card border) ─────────────────────
+
+function TextItemCard({ item, onRemove, onUpdate, onActivate, onDeactivate }: {
+  item: SpaceItem
+  onRemove: () => void
+  onUpdate: (updates: Partial<SpaceItem>) => void
+  onActivate?: () => void
+  onDeactivate?: () => void
+}) {
+  const [editing, setEditing] = useState(!item.content)
+  const [draft, setDraft] = useState(item.content ?? '')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (editing) {
+      textareaRef.current?.focus()
+      onActivate?.()
+    }
+  }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function save() {
+    const t = draft.trim()
+    if (!t) { onDeactivate?.(); onRemove(); return }
+    if (t !== item.content) onUpdate({ content: t })
+    setEditing(false)
+    onDeactivate?.()
+  }
+
+  return (
+    <div
+      className="relative group/text px-1 py-2 min-h-[2rem]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {editing ? (
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save() }
+            if (e.key === 'Escape') {
+              if (!draft.trim()) { onDeactivate?.(); onRemove(); return }
+              setDraft(item.content ?? ''); setEditing(false); onDeactivate?.()
+            }
+          }}
+          placeholder="Type here…"
+          rows={3}
+          className="w-full resize-none outline-none bg-transparent text-sm text-black/70 leading-relaxed placeholder:text-black/20"
+        />
+      ) : (
+        <p
+          className="text-sm text-black/70 leading-relaxed whitespace-pre-wrap cursor-text"
+          onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+        >
+          {item.content}
+        </p>
+      )}
+      {!editing && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="absolute top-0 right-0 opacity-0 group-hover/text:opacity-100 transition-opacity text-black/20 hover:text-black/50 p-1"
+          aria-label="Remove"
+        >
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── DividerItemCard — full-width separator with resize ────────────────────────
+
+function DividerItemCard({ item, onRemove, onUpdate }: {
+  item: SpaceItem
+  onRemove: () => void
+  onUpdate: (updates: Partial<SpaceItem>) => void
+}) {
+  const height = item.itemHeight ?? 56
+  const [isResizing, setIsResizing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+
+  function handleResizeMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    const startY = e.clientY
+    const startH = height
+    setIsResizing(true)
+    function onMove(ev: MouseEvent) {
+      const newH = Math.max(28, startH + (ev.clientY - startY))
+      onUpdate({ itemHeight: newH })
+    }
+    function onUp() {
+      setIsResizing(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  return (
+    <div
+      className="relative group/divider flex flex-col items-center justify-center"
+      style={{ minHeight: height }}
+    >
+      {/* Horizontal rule */}
+      <div className="w-full flex items-center gap-3 px-2">
+        <div className="flex-1 h-px bg-black/15" />
+        {item.content && (
+          <span className="text-[9px] uppercase tracking-widest text-black/30 font-medium shrink-0 select-none">{item.content}</span>
+        )}
+        <div className="flex-1 h-px bg-black/15" />
+      </div>
+
+      {/* Delete button — top right, 2-click confirm */}
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/divider:opacity-100 transition-opacity">
+        {confirming ? (
+          <div className="flex items-center gap-0.5 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
+            <button onClick={() => { onRemove(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+            <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirming(true)} className="text-black/25 hover:text-red-500 bg-white/70 rounded-sm p-0.5" aria-label="Remove divider">
+            <X size={10} />
+          </button>
+        )}
+      </div>
+
+      {/* Resize handle — bottom center */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-end justify-center pb-0.5 opacity-0 group-hover/divider:opacity-100 transition-opacity ${isResizing ? 'opacity-100' : ''}`}
+        title="Drag to adjust spacing"
+      >
+        <div className="w-8 h-0.5 bg-black/20 rounded-full" />
       </div>
     </div>
   )
@@ -293,6 +779,7 @@ function PostItemWrapper({
   item,
   sources,
   onRemove,
+  onDelete,
   onOpenSource,
   onAddNoteToSpace,
   onOpenPost,
@@ -302,6 +789,7 @@ function PostItemWrapper({
   item: SpaceItem
   sources: LibrarySource[]
   onRemove: () => void
+  onDelete?: () => void
   onOpenSource: (s: LibrarySource) => void
   onAddNoteToSpace: (content: string) => void
   onOpenPost: (post: Post) => void
@@ -311,15 +799,22 @@ function PostItemWrapper({
   const [confirming, setConfirming] = useState(false)
   const post = item.postData!
 
+  // Resolve source: explicit item.sourceRef takes priority, then derive from post.sourceId
+  const explicitSrc = item.sourceRef ? sources.find((s) => s.id === item.sourceRef) : null
+  const derivedSrc = !item.sourceRef && post.sourceId && post.sourceId !== 'manual'
+    ? (sources.find((s) => s.id === post.sourceId) ?? { id: post.sourceId, name: post.sourceName, color: post.sourceColor })
+    : null
+  const displaySrc = explicitSrc ?? derivedSrc
+
   return (
     <div className="group relative">
       {/* Remove from space — top-right */}
       <div className="absolute top-2 right-2 z-10">
         {confirming ? (
-          <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
-            <span className="text-[10px] text-black/40">Remove?</span>
-            <button onClick={onRemove} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1">Yes</button>
-            <button onClick={() => setConfirming(false)} className="text-[10px] text-black/40 hover:text-black px-1">No</button>
+          <div className="flex items-center gap-0.5 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
+            <button onClick={() => { onRemove(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+            {onDelete && <button onClick={() => { onDelete(); setConfirming(false) }} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1 transition-colors">Delete</button>}
+            <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
           </div>
         ) : (
           <button onClick={() => setConfirming(true)}
@@ -339,36 +834,33 @@ function PostItemWrapper({
         onAddNoteToSpace={onAddNoteToSpace}
       />
       <div className="px-4 pb-3 -mt-1 flex items-center gap-3">
-        {item.sourceRef && (() => {
-          const src = sources.find((s) => s.id === item.sourceRef)
-          if (!src) return null
-          return (
-            <span className="flex items-center gap-1">
+        {displaySrc && (
+          <span className="flex items-center gap-1">
+            <button
+              onClick={() => { const src = sources.find((s) => s.id === displaySrc.id); if (src) onOpenSource(src) }}
+              className="flex items-center gap-1 text-[9px] text-black/50 hover:text-black transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: displaySrc.color }} />
+              {displaySrc.name}
+            </button>
+            {/* Only show unlink (×) for explicitly-linked sources */}
+            {onUnlinkSource && item.sourceRef && (
               <button
-                onClick={() => onOpenSource(src)}
-                className="flex items-center gap-1 text-[9px] text-black/50 hover:text-black transition-colors"
+                onClick={onUnlinkSource}
+                title="Unlink source"
+                className="text-black/25 hover:text-black/60 transition-colors leading-none"
               >
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: src.color }} />
-                {src.name}
+                ×
               </button>
-              {onUnlinkSource && (
-                <button
-                  onClick={onUnlinkSource}
-                  title="Unlink source"
-                  className="text-black/25 hover:text-black/60 transition-colors leading-none"
-                >
-                  ×
-                </button>
-              )}
-            </span>
-          )
-        })()}
+            )}
+          </span>
+        )}
         {onConnectToSource && (
           <button
             onClick={onConnectToSource}
             className="flex items-center gap-1 text-[9px] text-black/30 hover:text-black/60 transition-colors"
           >
-            <Database size={9} />{item.sourceRef ? 'Change source' : 'Link to source'}
+            <Database size={9} />{displaySrc ? 'Change source' : 'Link to source'}
           </button>
         )}
       </div>
@@ -380,7 +872,7 @@ function PostItemWrapper({
 
 function SpaceWorkspace({
   space, allSpaces, onRename, onUpdateDescription,
-  onAddNote, onAddSource, onNestSpace, onRemoveItem, onReorderItems,
+  onAddNote, onAddSource, onNestSpace, onRemoveItem, onAppendItem, onReorderItems,
   onUpdateItem, onAddLink, onAddMedia, onMoveItem, onCopyItem, onUpdateTags,
   onNavigateToSpace, onOpenSourcePanel, onOpenPostPanel, onConnectItemToSource,
 }: {
@@ -391,6 +883,7 @@ function SpaceWorkspace({
   onAddSource: (spaceId: string, sourceId: string) => void
   onNestSpace: (parentId: string, childId: string) => void
   onRemoveItem: (spaceId: string, itemId: string) => void
+  onAppendItem: (spaceId: string, item: SpaceItem) => void
   onReorderItems: (spaceId: string, items: SpaceItem[]) => void
   onUpdateItem: (spaceId: string, itemId: string, updates: Partial<SpaceItem>) => void
   onAddLink: () => void
@@ -417,12 +910,51 @@ function SpaceWorkspace({
 
   // Tags
   const [tagInput, setTagInput] = useState('')
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const tagInputRef = useRef<HTMLInputElement>(null)
+
+  const allExistingTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    for (const s of allSpaces) for (const t of (s.tags ?? [])) tagSet.add(t)
+    return Array.from(tagSet).sort()
+  }, [allSpaces])
 
   // Note input
   const [addingNote, setAddingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
   const noteRef = useRef<HTMLTextAreaElement>(null)
+
+  // Canvas text items
+  const [activeTextItemId, setActiveTextItemId] = useState<string | null>(null)
+  const contentAreaRef = useRef<HTMLDivElement>(null)
+
+  // Drag state for floating text items (local — persisted on pointer up)
+  const [draggedText, setDraggedText] = useState<{ id: string; posX: number; posY: number } | null>(null)
+
+  function handleTextDragStart(e: React.PointerEvent<HTMLElement>, item: SpaceItem) {
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX, startY = e.clientY
+    const startPosX = item.posX ?? 24, startPosY = item.posY ?? 24
+    setDraggedText({ id: item.id, posX: startPosX, posY: startPosY })
+    function onMove(ev: PointerEvent) {
+      setDraggedText({
+        id: item.id,
+        posX: Math.max(0, startPosX + ev.clientX - startX),
+        posY: Math.max(0, startPosY + ev.clientY - startY),
+      })
+    }
+    function onUp(ev: PointerEvent) {
+      const newX = Math.max(0, startPosX + ev.clientX - startX)
+      const newY = Math.max(0, startPosY + ev.clientY - startY)
+      onUpdateItem(space.id, item.id, { posX: newX, posY: newY })
+      setDraggedText(null)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }
 
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false)
 
@@ -508,17 +1040,54 @@ function SpaceWorkspace({
     setActiveId(null)
     const { active, over } = e
     if (!over || active.id === over.id) return
-    const oldIndex = displayItems.findIndex((i) => i.id === active.id)
-    const newIndex = displayItems.findIndex((i) => i.id === over.id)
-    const reordered = arrayMove(displayItems, oldIndex, newIndex)
-    setDisplayItems(reordered)
-    onReorderItems(space.id, reordered)
+    const oldIndex = standaloneItems.findIndex((i) => i.id === active.id)
+    const newIndex = standaloneItems.findIndex((i) => i.id === over.id)
+    const reorderedStandalone = arrayMove(standaloneItems, oldIndex, newIndex)
+    // Reconstruct full list: each standalone item followed by its attached notes
+    const full = reorderedStandalone.flatMap(item => [item, ...(attachedNoteMap.get(item.id) ?? [])])
+    setDisplayItems(full)
+    onReorderItems(space.id, full)
   }
 
   const activeItem = activeId ? displayItems.find((i) => i.id === activeId) : null
 
   const sourceMap = useMemo(() => Object.fromEntries(sources.map((s) => [s.id, s])), [sources])
   const spaceMap = useMemo(() => Object.fromEntries(allSpaces.map((s) => [s.id, s])), [allSpaces])
+
+  // Note-article grouping: notes with postRef whose article is also in this space
+  const attachedNoteMap = useMemo(() => {
+    const map = new Map<string, SpaceItem[]>()
+    const postItemIdByPostDataId = new Map<string, string>()
+    for (const item of displayItems) {
+      if (item.type === 'post' && item.postData) postItemIdByPostDataId.set(item.postData.id, item.id)
+    }
+    for (const item of displayItems) {
+      if (item.type === 'note' && item.postRef) {
+        const postItemId = postItemIdByPostDataId.get(item.postRef.id)
+        if (postItemId) {
+          const existing = map.get(postItemId) ?? []
+          map.set(postItemId, [...existing, item])
+        }
+      }
+    }
+    return map
+  }, [displayItems])
+
+  const attachedNoteIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const notes of attachedNoteMap.values()) for (const n of notes) ids.add(n.id)
+    return ids
+  }, [attachedNoteMap])
+
+  const textItems = useMemo(
+    () => displayItems.filter(item => item.type === 'text'),
+    [displayItems]
+  )
+
+  const standaloneItems = useMemo(
+    () => displayItems.filter(item => !attachedNoteIds.has(item.id) && item.type !== 'text'),
+    [displayItems, attachedNoteIds]
+  )
 
   // "Appears in" map: copyGroupId → list of space IDs that contain it
   const appearsInMap = useMemo(() => {
@@ -545,18 +1114,76 @@ function SpaceWorkspace({
   const nestableSpaces = allSpaces.filter((s) => s.id !== space.id && !nestedIds.has(s.id))
 
   function renderItemContent(item: SpaceItem) {
-    const remove = () => onRemoveItem(space.id, item.id)
+    const remove = () => {
+      onRemoveItem(space.id, item.id)
+      pushUndo({ label: 'Remove item', undo: () => onAppendItem(space.id, item) })
+    }
+    const deleteFromAll = () => {
+      const appearsIn = getAppearsIn(item)
+      onRemoveItem(space.id, item.id)
+      for (const { id: spaceId } of appearsIn) {
+        const s = allSpaces.find(sp => sp.id === spaceId)
+        const gid = item.copyGroupId ?? item.id
+        const matchingItem = s?.items.find(i => (i.copyGroupId ?? i.id) === gid)
+        if (matchingItem) onRemoveItem(spaceId, matchingItem.id)
+      }
+      pushUndo({ label: 'Delete item', undo: () => onAppendItem(space.id, item) })
+    }
+    if (item.type === 'divider') {
+      return <DividerItemCard item={item} onRemove={remove} onUpdate={(updates) => onUpdateItem(space.id, item.id, updates)} />
+    }
+    if (item.type === 'text') {
+      return (
+        <TextItemCard
+          item={item}
+          onRemove={remove}
+          onUpdate={(updates) => onUpdateItem(space.id, item.id, updates)}
+          onActivate={() => setActiveTextItemId(item.id)}
+          onDeactivate={() => setActiveTextItemId((prev) => prev === item.id ? null : prev)}
+        />
+      )
+    }
     if (item.type === 'post' && item.postData) {
+      const attachedNotes = attachedNoteMap.get(item.id) ?? []
+      const unlinkSource = item.sourceRef ? () => {
+        const prev = { sourceRef: item.sourceRef, cardRef: item.cardRef }
+        onUpdateItem(space.id, item.id, { sourceRef: undefined, cardRef: undefined })
+        pushUndo({ label: 'Unlink source', undo: () => onUpdateItem(space.id, item.id, prev) })
+      } : undefined
+
+      if (attachedNotes.length > 0) {
+        return (
+          <MergedArticleNoteCard
+            item={item}
+            attachedNotes={attachedNotes}
+            sources={sources}
+            onRemovePost={remove}
+            onDeletePost={deleteFromAll}
+            onRemoveNote={(noteId) => {
+              const note = attachedNotes.find((n) => n.id === noteId)
+              onRemoveItem(space.id, noteId)
+              if (note) pushUndo({ label: 'Remove note', undo: () => onAppendItem(space.id, note) })
+            }}
+            onUpdateNote={(noteId, updates) => onUpdateItem(space.id, noteId, updates)}
+            onOpenPost={(post) => onOpenPostPanel(post, item)}
+            onOpenSource={(s) => onOpenSourcePanel(s)}
+            onConnectToSource={() => onConnectItemToSource(item)}
+            onUnlinkSource={unlinkSource}
+          />
+        )
+      }
+
       return (
         <PostItemWrapper
           item={item}
           sources={sources}
           onRemove={remove}
+          onDelete={deleteFromAll}
           onOpenSource={(s) => onOpenSourcePanel(s)}
           onOpenPost={(post) => onOpenPostPanel(post, item)}
           onAddNoteToSpace={(content) => onAddNote(space.id, content, { postRef: item.postData, sourceRef: item.postData?.sourceId })}
           onConnectToSource={() => onConnectItemToSource(item)}
-          onUnlinkSource={item.sourceRef ? () => onUpdateItem(space.id, item.id, { sourceRef: undefined, cardRef: undefined }) : undefined}
+          onUnlinkSource={unlinkSource}
         />
       )
     }
@@ -566,6 +1193,7 @@ function SpaceWorkspace({
         <NoteItemCard
           item={item}
           onRemove={remove}
+          onDelete={deleteFromAll}
           onUpdate={(updates) => onUpdateItem(space.id, item.id, updates)}
           onOpenSource={(sourceId) => {
             const src = sourceMap[sourceId]
@@ -589,6 +1217,7 @@ function SpaceWorkspace({
           item={item}
           source={item.refId ? sourceMap[item.refId] : undefined}
           onRemove={remove}
+          onDelete={deleteFromAll}
           onOpenSource={(s) => onOpenSourcePanel(s)}
         />
       )
@@ -600,19 +1229,36 @@ function SpaceWorkspace({
           space={item.refId ? spaceMap[item.refId] : undefined}
           onNavigate={() => window.dispatchEvent(new CustomEvent('remix:navigate-space', { detail: item.refId }))}
           onRemove={remove}
+          onDelete={deleteFromAll}
         />
       )
     }
     if (item.type === 'media') {
-      return <MediaItemCard item={item} onRemove={remove} />
+      return <MediaItemCard item={item} onRemove={remove} onDelete={deleteFromAll} />
     }
     return null
   }
 
+  function handleCanvasClick(e: React.MouseEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement
+    // Skip if clicked inside a card, header area, toolbar, or interactive element
+    if (target.closest('[data-space-item]')) return
+    if (target.closest('[data-no-canvas]')) return
+    if (target.closest('button, input, textarea, a, [role="button"]')) return
+    if (activeTextItemId) return
+    if (!contentAreaRef.current) return
+    const rect = contentAreaRef.current.getBoundingClientRect()
+    const posX = Math.max(0, e.clientX - rect.left)
+    const posY = Math.max(0, e.clientY - rect.top)
+    const id = `${Date.now()}-text`
+    onAppendItem(space.id, { id, type: 'text', content: '', addedAt: Date.now(), posX, posY })
+    setActiveTextItemId(id)
+  }
+
   return (
-    <div className="p-6 max-w-5xl">
+    <div ref={contentAreaRef} className="p-6 max-w-5xl min-h-full relative" onClick={handleCanvasClick}>
       {/* Space header */}
-      <div className="mb-6 space-y-2">
+      <div className="mb-6 space-y-2" data-no-canvas="true">
         {editingName ? (
           <input ref={nameRef} value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') commitName(); if (e.key === 'Escape') { setNameDraft(space.name); setEditingName(false) } }}
@@ -638,33 +1284,78 @@ function SpaceWorkspace({
               <button onClick={() => onUpdateTags(space.id, (space.tags ?? []).filter((t) => t !== tag))} className="text-black/30 hover:text-black ml-0.5">×</button>
             </span>
           ))}
-          <input
-            ref={tagInputRef}
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
-                e.preventDefault()
-                const tag = tagInput.trim().replace(/,$/, '')
-                if (tag && !(space.tags ?? []).includes(tag)) onUpdateTags(space.id, [...(space.tags ?? []), tag])
-                setTagInput('')
-              }
-              if (e.key === 'Backspace' && !tagInput && (space.tags ?? []).length > 0) {
-                onUpdateTags(space.id, (space.tags ?? []).slice(0, -1))
-              }
-            }}
-            placeholder={(space.tags ?? []).length === 0 ? '+ Add tag…' : '+ tag'}
-            className="text-[10px] text-black/40 outline-none bg-transparent placeholder:text-black/20 min-w-[60px] w-auto"
-          />
+          <div className="relative">
+            <input
+              ref={tagInputRef}
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onFocus={() => setTagDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setTagDropdownOpen(false), 150)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                  e.preventDefault()
+                  const tag = tagInput.trim().replace(/,$/, '')
+                  if (tag && !(space.tags ?? []).includes(tag)) onUpdateTags(space.id, [...(space.tags ?? []), tag])
+                  setTagInput('')
+                  setTagDropdownOpen(false)
+                }
+                if (e.key === 'Backspace' && !tagInput && (space.tags ?? []).length > 0) {
+                  onUpdateTags(space.id, (space.tags ?? []).slice(0, -1))
+                }
+                if (e.key === 'Escape') { setTagDropdownOpen(false); tagInputRef.current?.blur() }
+              }}
+              placeholder={(space.tags ?? []).length === 0 ? '+ Add tag…' : '+ tag'}
+              className="text-[10px] text-black/40 outline-none bg-transparent placeholder:text-black/20 min-w-[60px] w-auto"
+            />
+            {tagDropdownOpen && (() => {
+              const filtered = allExistingTags.filter(t =>
+                !(space.tags ?? []).includes(t) &&
+                (tagInput === '' || t.toLowerCase().includes(tagInput.toLowerCase()))
+              )
+              const canCreate = tagInput.trim() && !(space.tags ?? []).includes(tagInput.trim())
+              return (filtered.length > 0 || canCreate) ? (
+                <div className="absolute top-full left-0 z-50 bg-white border border-black/15 shadow-md py-0.5 min-w-[140px] max-h-40 overflow-y-auto">
+                  {filtered.map(tag => (
+                    <button
+                      key={tag}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        onUpdateTags(space.id, [...(space.tags ?? []), tag])
+                        setTagInput('')
+                        setTagDropdownOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-[10px] text-black/60 hover:bg-black/5 hover:text-black transition-colors"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                  {canCreate && (
+                    <button
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        onUpdateTags(space.id, [...(space.tags ?? []), tagInput.trim()])
+                        setTagInput('')
+                        setTagDropdownOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-[10px] text-black/50 hover:bg-black/5 hover:text-black transition-colors border-t border-black/8 flex items-center gap-1"
+                    >
+                      <Plus size={9} />Create &ldquo;{tagInput.trim()}&rdquo;
+                    </button>
+                  )}
+                </div>
+              ) : null
+            })()}
+          </div>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+      <div className="flex items-center gap-2 mb-6 flex-wrap" data-no-canvas="true">
         {[
           { label: 'Note', icon: <FileText size={12} />, onClick: () => setAddingNote(true) },
           { label: 'Link', icon: <Link2 size={12} />, onClick: onAddLink },
           { label: uploading ? 'Uploading…' : 'Media', icon: <ImageIcon size={12} />, onClick: () => mediaInputRef.current?.click(), disabled: uploading },
+          { label: 'Divider', icon: <Minus size={12} />, onClick: () => onAppendItem(space.id, { id: `${Date.now()}-div`, type: 'divider', addedAt: Date.now() }) },
         ].map(({ label, icon, onClick, disabled }) => (
           <button key={label} onClick={onClick} disabled={disabled}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors disabled:opacity-40">
@@ -704,7 +1395,7 @@ function SpaceWorkspace({
 
       {/* Inline note input */}
       {addingNote && (
-        <div className="mb-4 border border-black/15 bg-white p-3 space-y-2">
+        <div className="mb-4 border border-black/15 bg-white p-3 space-y-2" data-no-canvas="true">
           <textarea ref={noteRef} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveNote(); if (e.key === 'Escape') { setNoteDraft(''); setAddingNote(false) } }}
             placeholder="Write a note… (⌘+Enter to save)" rows={3}
@@ -718,16 +1409,16 @@ function SpaceWorkspace({
       )}
 
       {/* Content grid with DnD */}
-      {displayItems.length === 0 && !addingNote ? (
-        <div className="text-center py-20 text-black/25 text-sm space-y-2">
+      {standaloneItems.length === 0 && textItems.length === 0 && !addingNote ? (
+        <div className="text-center py-20 text-black/25 text-sm space-y-2 select-none pointer-events-none">
           <p>This space is empty.</p>
-          <p className="text-[10px]">Add a note, link, media, source, or nested space above.</p>
+          <p className="text-[10px]">Click anywhere to start typing, or use the toolbar above.</p>
         </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <SortableContext items={displayItems.map((i) => i.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={standaloneItems.map((i) => i.id)} strategy={rectSortingStrategy}>
             <div className="grid gap-x-4 gap-y-0" style={{ gridAutoRows: '4px', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-              {displayItems.map((item) => (
+              {standaloneItems.map((item) => (
                 <SortableItem
                   key={item.id}
                   id={item.id}
@@ -757,6 +1448,42 @@ function SpaceWorkspace({
         </DndContext>
       )}
 
+      {/* Absolutely positioned floating text items */}
+      {textItems.map((item) => {
+        const remove = () => {
+          onRemoveItem(space.id, item.id)
+          pushUndo({ label: 'Remove item', undo: () => onAppendItem(space.id, item) })
+        }
+        const isDragging = draggedText?.id === item.id
+        const posX = isDragging ? draggedText!.posX : (item.posX ?? 24)
+        const posY = isDragging ? draggedText!.posY : (item.posY ?? 24)
+        return (
+          <div
+            key={item.id}
+            className="group/text-float"
+            style={{ position: 'absolute', left: posX, top: posY, minWidth: 160, maxWidth: 360, zIndex: isDragging ? 20 : 10 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle — appears on hover, sits above the card */}
+            <div
+              onPointerDown={(e) => handleTextDragStart(e, item)}
+              className="absolute -top-4 left-0 right-0 flex justify-center opacity-0 group-hover/text-float:opacity-100 transition-opacity cursor-grab active:cursor-grabbing touch-none"
+              title="Drag to move"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical size={12} className="text-black/30 hover:text-black/60 transition-colors rotate-90" />
+            </div>
+            <TextItemCard
+              item={item}
+              onRemove={remove}
+              onUpdate={(updates) => onUpdateItem(space.id, item.id, updates)}
+              onActivate={() => setActiveTextItemId(item.id)}
+              onDeactivate={() => setActiveTextItemId((prev) => prev === item.id ? null : prev)}
+            />
+          </div>
+        )
+      })}
+
       {/* Source picker for adding source to space */}
       {sourcePickerOpen && (
         <SourcePickerModal
@@ -766,6 +1493,57 @@ function SpaceWorkspace({
         />
       )}
 
+    </div>
+  )
+}
+
+// ── Folder trash bin (left panel) ────────────────────────────────────────────
+
+function FolderTrashBin({
+  folders, onRestore, onPermanentDelete,
+}: {
+  folders: SpaceFolder[]
+  onRestore: (id: string) => void
+  onPermanentDelete: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+
+  return (
+    <div className="border-t border-black/10 shrink-0">
+      <button
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-black/30 hover:text-black/60 transition-colors"
+      >
+        <Folder size={11} />
+        <span>Folder trash ({folders.length})</span>
+        <span className="ml-auto">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="pb-1">
+          {folders.map((f) => (
+            <div key={f.id} className="group flex items-center gap-2 px-3 py-2 hover:bg-black/3 transition-colors">
+              <span className="flex-1 text-xs text-black/40 truncate">{f.name}</span>
+              {confirmId === f.id ? (
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-black/40">Delete forever?</span>
+                  <button onClick={() => { onPermanentDelete(f.id); setConfirmId(null) }} className="text-[10px] text-red-500 font-medium px-1">Yes</button>
+                  <button onClick={() => setConfirmId(null)} className="text-[10px] text-black/40 px-1">No</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => onRestore(f.id)} className="text-[10px] text-black/40 hover:text-black flex items-center gap-0.5 px-1">
+                    <RotateCcw size={9} />Restore
+                  </button>
+                  <button onClick={() => setConfirmId(f.id)} className="text-[10px] text-red-400 hover:text-red-600 px-1">
+                    <Trash2 size={9} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -830,7 +1608,21 @@ function RemixPageInner() {
     nestSpace, removeItem, reorderItems, updateItem, appendItem, updateSpaceTags,
   } = useSpaces()
 
-  const { sources, setCategory, setIndustry, addTag, removeTag, renameSource, allTags, addSourceCard, removeSourceCard } = useLibrarySources()
+  const { folders, trashedFolders, createFolder, renameFolder, deleteFolder, restoreFolder, permanentDeleteFolder, addSpaceToFolder, removeSpaceFromFolder, getFolderForSpace, reorderFolders, sidebarOrder, updateSidebarOrder } = useSpaceFolders()
+
+  function deleteFolderWithContents(folderId: string) {
+    const folder = folders.find(f => f.id === folderId)
+    if (folder) {
+      for (const spaceId of folder.spaceIds) {
+        deleteSpace(spaceId)
+        pushUndo({ label: 'Delete space', undo: () => restoreSpace(spaceId) })
+      }
+    }
+    deleteFolder(folderId)
+  }
+  const [newFolderId, setNewFolderId] = useState<string | null>(null)
+  useEffect(() => { if (newFolderId) { const t = setTimeout(() => setNewFolderId(null), 500); return () => clearTimeout(t) } }, [newFolderId])
+  const { sources, setCategory, setIndustry, addTag, removeTag, renameSource, allTags, addSourceCard, removeSourceCard, addAssociation, removeAssociation } = useLibrarySources()
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
   const { addComment } = useComments()
@@ -1034,6 +1826,47 @@ function RemixPageInner() {
     return filtered
   }, [spaces, searchQuery, sortBy])
 
+  // Sidebar DnD for reordering folders + uncategorized spaces together
+  const sidebarSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  // Build effective ordered sidebar list (folders + uncategorized spaces interleaved)
+  const buildSidebarItems = useCallback((
+    currentFolders: typeof folders,
+    currentSpaces: typeof filteredSpaces,
+    order: SidebarEntry[]
+  ): SidebarEntry[] => {
+    const folderIds = new Set(currentFolders.map(f => f.id))
+    const uncatIds = new Set(currentSpaces.filter(s => !getFolderForSpace(s.id) && !s.deletedAt).map(s => s.id))
+    // Filter stored order to existing items
+    const ordered = order.filter(e =>
+      (e.type === 'folder' && folderIds.has(e.id)) ||
+      (e.type === 'space' && uncatIds.has(e.id))
+    )
+    const orderedIdSet = new Set(ordered.map(e => e.id))
+    // Append any new items not in stored order
+    for (const f of currentFolders) {
+      if (!orderedIdSet.has(f.id)) { ordered.push({ type: 'folder', id: f.id }); orderedIdSet.add(f.id) }
+    }
+    for (const s of currentSpaces) {
+      if (!s.deletedAt && uncatIds.has(s.id) && !orderedIdSet.has(s.id)) { ordered.push({ type: 'space', id: s.id }); orderedIdSet.add(s.id) }
+    }
+    return ordered
+  }, [getFolderForSpace]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSidebarDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const currentItems = buildSidebarItems(folders, filteredSpaces, sidebarOrder)
+    const oldIdx = currentItems.findIndex(i => i.id === active.id)
+    const newIdx = currentItems.findIndex(i => i.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordered = arrayMove(currentItems, oldIdx, newIdx)
+    updateSidebarOrder(reordered)
+    // Also update folder order to match
+    const newFolderOrder = reordered.filter(e => e.type === 'folder').map(e => e.id)
+    reorderFolders(newFolderOrder)
+  }
+
   function handleCreateAndSelect() {
     const id = createSpace('New space')
     setSelectedSpaceId(id)
@@ -1104,6 +1937,9 @@ function RemixPageInner() {
                   </div>
                 )}
               </div>
+              <button onClick={() => { const id = createFolder('New folder'); setNewFolderId(id) }} className="text-black/30 hover:text-black transition-colors p-0.5" title="New folder">
+                <Folder size={13} />
+              </button>
               <button onClick={handleCreateAndSelect} className="text-xs text-black/40 hover:text-black transition-colors flex items-center gap-1">
                 <Plus size={13} />New
               </button>
@@ -1122,7 +1958,8 @@ function RemixPageInner() {
               <div className="flex justify-center py-10"><Loader2 className="animate-spin text-black/20" size={18} /></div>
             ) : filteredSpaces.length === 0 ? (
               <p className="text-center py-10 text-xs text-black/25">{searchQuery ? 'No matches.' : 'No spaces yet.'}</p>
-            ) : (
+            ) : searchQuery ? (
+              // Flat list when searching
               filteredSpaces.map((space) => (
                 <SpaceRow
                   key={space.id}
@@ -1130,13 +1967,90 @@ function RemixPageInner() {
                   active={selectedSpaceId === space.id}
                   onSelect={() => setSelectedSpaceId(space.id)}
                   onRename={renameSpace}
-                  onDelete={(id) => { deleteSpace(id); if (selectedSpaceId === id) setSelectedSpaceId(null) }}
+                  onDelete={(id) => { deleteSpace(id); pushUndo({ label: 'Delete space', undo: () => restoreSpace(id) }); if (selectedSpaceId === id) setSelectedSpaceId(null) }}
+                  folders={folders}
+                  onMoveToFolder={(folderId) => addSpaceToFolder(folderId, space.id)}
+                  onRemoveFromFolder={() => removeSpaceFromFolder(getFolderForSpace(space.id) ?? '', space.id)}
+                  currentFolderId={getFolderForSpace(space.id)}
                 />
               ))
-            )}
+            ) : (() => {
+              // Combined folder+space ordered view
+              const sidebarItems = buildSidebarItems(folders, filteredSpaces, sidebarOrder)
+              const folderMap = Object.fromEntries(folders.map(f => [f.id, f]))
+              const spaceMap2 = Object.fromEntries(filteredSpaces.map(s => [s.id, s]))
+              return (
+                <DndContext sensors={sidebarSensors} collisionDetection={closestCenter} onDragEnd={handleSidebarDragEnd}>
+                  <SortableContext items={sidebarItems.map(i => i.id)} strategy={rectSortingStrategy}>
+                    {sidebarItems.map((entry) => {
+                      if (entry.type === 'folder') {
+                        const folder = folderMap[entry.id]
+                        if (!folder) return null
+                        const folderSpaces = folder.spaceIds
+                          .map(id => filteredSpaces.find(s => s.id === id))
+                          .filter(Boolean) as Space[]
+                        return (
+                          <SortableRow key={folder.id} id={folder.id}>
+                            {(_isDragging, listeners) => (
+                              <FolderRow
+                                folder={folder}
+                                spaces={folderSpaces}
+                                activeSpaceId={selectedSpaceId}
+                                onSelectSpace={setSelectedSpaceId}
+                                onRenameSpace={renameSpace}
+                                onDeleteSpace={(id) => { deleteSpace(id); pushUndo({ label: 'Delete space', undo: () => restoreSpace(id) }); if (selectedSpaceId === id) setSelectedSpaceId(null) }}
+                                onRenameFolder={renameFolder}
+                                onDeleteFolder={deleteFolder}
+                                onDeleteFolderWithContents={deleteFolderWithContents}
+                                allFolders={folders}
+                                onMoveToFolder={(spaceId, folderId) => addSpaceToFolder(folderId, spaceId)}
+                                onRemoveFromFolder={(spaceId) => removeSpaceFromFolder(folder.id, spaceId)}
+                                getFolderForSpace={getFolderForSpace}
+                                autoRename={newFolderId === folder.id}
+                                dragListeners={listeners}
+                              />
+                            )}
+                          </SortableRow>
+                        )
+                      }
+                      // type === 'space' (uncategorized)
+                      const space = spaceMap2[entry.id]
+                      if (!space || space.deletedAt) return null
+                      return (
+                        <SortableRow key={space.id} id={space.id}>
+                          {(_isDragging, listeners) => (
+                            <SpaceRow
+                              space={space}
+                              active={selectedSpaceId === space.id}
+                              onSelect={() => setSelectedSpaceId(space.id)}
+                              onRename={renameSpace}
+                              onDelete={(id) => { deleteSpace(id); pushUndo({ label: 'Delete space', undo: () => restoreSpace(id) }); if (selectedSpaceId === id) setSelectedSpaceId(null) }}
+                              folders={folders}
+                              onMoveToFolder={(folderId) => addSpaceToFolder(folderId, space.id)}
+                              onRemoveFromFolder={() => removeSpaceFromFolder(getFolderForSpace(space.id) ?? '', space.id)}
+                              currentFolderId={null}
+                              dragListeners={listeners}
+                            />
+                          )}
+                        </SortableRow>
+                      )
+                    })}
+                  </SortableContext>
+                </DndContext>
+              )
+            })()}
           </div>
 
-          {/* Trash bin */}
+          {/* Folder trash */}
+          {trashedFolders.length > 0 && (
+            <FolderTrashBin
+              folders={trashedFolders}
+              onRestore={restoreFolder}
+              onPermanentDelete={permanentDeleteFolder}
+            />
+          )}
+
+          {/* Space trash */}
           {trashedSpaces.length > 0 && (
             <TrashBin
               spaces={trashedSpaces}
@@ -1169,6 +2083,7 @@ function RemixPageInner() {
                 onAddSource={addSource}
                 onNestSpace={nestSpace}
                 onRemoveItem={removeItem}
+                onAppendItem={appendItem}
                 onReorderItems={reorderItems}
                 onUpdateItem={updateItem}
                 onAddLink={() => openAddLink(selectedSpace.id)}
@@ -1237,6 +2152,10 @@ function RemixPageInner() {
               allSpaces={spaces.filter(s => !s.deletedAt)}
               savedLists={spaces.filter(s => !s.deletedAt)}
               commentToSpaces={commentToSpaces}
+              allLibrarySources={sources}
+              onAddAssociation={(targetId) => addAssociation(openSourcePanel.id, targetId)}
+              onRemoveAssociation={(targetId) => removeAssociation(openSourcePanel.id, targetId)}
+              onOpenAssociation={(src) => openSourcePanelExclusive(src)}
             />
           )}
         </div>

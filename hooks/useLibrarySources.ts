@@ -38,6 +38,14 @@ const STATIC_LIBRARY_SOURCES: LibrarySource[] = [
 ]
 
 const LS_CACHE_KEY = 'library_sources_cache_v1'
+const LS_ASSOCIATIONS_KEY = 'source_associations_v1'
+
+function readAssociations(): Record<string, string[]> {
+  try { return JSON.parse(localStorage.getItem(LS_ASSOCIATIONS_KEY) ?? '{}') } catch { return {} }
+}
+function writeAssociations(a: Record<string, string[]>) {
+  try { localStorage.setItem(LS_ASSOCIATIONS_KEY, JSON.stringify(a)) } catch { /* ignore */ }
+}
 
 function readCache(): LibrarySource[] | null {
   try {
@@ -77,9 +85,11 @@ export function useLibrarySources() {
     fetch('/api/db/user-sources')
       .then((r) => r.json())
       .then((data: LibrarySource[]) => {
+        const assocs = readAssociations()
+        const withAssocs = (srcs: LibrarySource[]) => srcs.map(s => ({ ...s, associations: assocs[s.id] ?? s.associations ?? [] }))
         if (data.length > 0) {
           // DB returned real data — merge, cache, and use it
-          const merged = mergeSources(data)
+          const merged = withAssocs(mergeSources(data))
           writeCache(merged)
           setSources(merged)
         } else {
@@ -87,21 +97,23 @@ export function useLibrarySources() {
           // Fall back to localStorage cache to preserve user's work
           const cached = readCache()
           if (cached && cached.length > 0) {
-            setSources(cached)
+            setSources(withAssocs(cached))
           } else {
             // No cache either — use hardcoded statics so the feed still works
-            setSources(STATIC_LIBRARY_SOURCES)
+            setSources(withAssocs(STATIC_LIBRARY_SOURCES))
           }
         }
         setLoaded(true)
       })
       .catch(() => {
         // Network or DB error — same fallback chain
+        const assocs = readAssociations()
+        const withAssocs = (srcs: LibrarySource[]) => srcs.map(s => ({ ...s, associations: assocs[s.id] ?? s.associations ?? [] }))
         const cached = readCache()
         if (cached && cached.length > 0) {
-          setSources(cached)
+          setSources(withAssocs(cached))
         } else {
-          setSources(STATIC_LIBRARY_SOURCES)
+          setSources(withAssocs(STATIC_LIBRARY_SOURCES))
         }
         setLoaded(true)
       })
@@ -144,6 +156,11 @@ export function useLibrarySources() {
   const renameSource = useCallback((id: string, name: string) => {
     updateSources((prev) => prev.map((s) => s.id === id ? { ...s, name } : s))
     persist(`/api/db/user-sources/${id}`, 'PATCH', { name })
+  }, [updateSources])
+
+  const setSummary = useCallback((id: string, summary: string) => {
+    updateSources((prev) => prev.map((s) => s.id === id ? { ...s, summary } : s))
+    persist(`/api/db/user-sources/${id}`, 'PATCH', { summary })
   }, [updateSources])
 
   const toggleFeed = useCallback((id: string) => {
@@ -217,6 +234,33 @@ export function useLibrarySources() {
     }))
   }, [updateSources])
 
+  // Associations are stored in a separate localStorage key (no DB sync required)
+  const addAssociation = useCallback((sourceId: string, targetId: string) => {
+    const allAssocs = readAssociations()
+    const srcList = allAssocs[sourceId] ?? []
+    const tgtList = allAssocs[targetId] ?? []
+    if (!srcList.includes(targetId)) allAssocs[sourceId] = [...srcList, targetId]
+    if (!tgtList.includes(sourceId)) allAssocs[targetId] = [...tgtList, sourceId]
+    writeAssociations(allAssocs)
+    updateSources((prev) => prev.map((s) => {
+      if (s.id === sourceId) return { ...s, associations: allAssocs[sourceId] }
+      if (s.id === targetId) return { ...s, associations: allAssocs[targetId] }
+      return s
+    }))
+  }, [updateSources])
+
+  const removeAssociation = useCallback((sourceId: string, targetId: string) => {
+    const allAssocs = readAssociations()
+    allAssocs[sourceId] = (allAssocs[sourceId] ?? []).filter((id) => id !== targetId)
+    allAssocs[targetId] = (allAssocs[targetId] ?? []).filter((id) => id !== sourceId)
+    writeAssociations(allAssocs)
+    updateSources((prev) => prev.map((s) => {
+      if (s.id === sourceId) return { ...s, associations: allAssocs[sourceId] }
+      if (s.id === targetId) return { ...s, associations: allAssocs[targetId] }
+      return s
+    }))
+  }, [updateSources])
+
   return {
     sources,
     staticSources,
@@ -233,5 +277,8 @@ export function useLibrarySources() {
     removeTag,
     addSourceCard,
     removeSourceCard,
+    addAssociation,
+    removeAssociation,
+    setSummary,
   }
 }

@@ -7,6 +7,7 @@ import type { SpaceItem, SpaceItemVersion, Post, LibrarySource } from '@/lib/typ
 interface Props {
   item: SpaceItem
   onRemove: () => void
+  onDelete?: () => void
   onUpdate: (updates: Partial<SpaceItem>) => void
   onOpenSource?: (sourceId: string) => void
   onOpenPost?: (post: Post) => void
@@ -24,7 +25,7 @@ function formatDateTime(ts: number) {
   return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-export function NoteItemCard({ item, onRemove, onUpdate, onOpenSource, onOpenPost, onConnectToSource, onDisconnectSource, onNoteEdited, sourceName, sourceColor }: Props) {
+export function NoteItemCard({ item, onRemove, onDelete, onUpdate, onOpenSource, onOpenPost, onConnectToSource, onDisconnectSource, onNoteEdited, sourceName, sourceColor }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(item.content ?? '')
   const [confirming, setConfirming] = useState(false)
@@ -82,16 +83,16 @@ export function NoteItemCard({ item, onRemove, onUpdate, onOpenSource, onOpenPos
               </div>
             </div>
           ) : (
-            <p className="text-sm text-black/80 leading-relaxed flex-1 whitespace-pre-wrap">{item.content}</p>
+            <p className="text-sm text-black/80 leading-relaxed flex-1 whitespace-pre-wrap cursor-text" onClick={() => setEditing(true)}>{item.content}</p>
           )}
 
           {!editing && (
             <div className="flex flex-col gap-0.5 shrink-0">
               {confirming ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-black/40">Remove?</span>
-                  <button onClick={onRemove} className="text-[10px] text-red-500 font-medium px-1">Yes</button>
-                  <button onClick={() => setConfirming(false)} className="text-[10px] text-black/40 px-1">No</button>
+                <div className="flex items-center gap-0.5">
+                  <button onClick={() => { onRemove(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+                  {onDelete && <button onClick={() => { onDelete(); setConfirming(false) }} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1 transition-colors">Delete</button>}
+                  <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
                 </div>
               ) : (
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

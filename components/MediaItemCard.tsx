@@ -7,11 +7,12 @@ import type { SpaceItem } from '@/lib/types'
 interface Props {
   item: SpaceItem
   onRemove: () => void
+  onDelete?: () => void
 }
 
 const DEFAULT_HEIGHT = 240
 
-export function MediaItemCard({ item, onRemove }: Props) {
+export function MediaItemCard({ item, onRemove, onDelete }: Props) {
   const [confirming, setConfirming] = useState(false)
   const url = item.content ?? ''
   const type = item.mediaType ?? 'image'
@@ -22,10 +23,10 @@ export function MediaItemCard({ item, onRemove }: Props) {
       {/* Remove confirm */}
       <div className="absolute bottom-2 left-2 z-10">
         {confirming ? (
-          <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
-            <span className="text-[10px] text-black/40">Remove?</span>
-            <button onClick={onRemove} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1">Yes</button>
-            <button onClick={() => setConfirming(false)} className="text-[10px] text-black/40 hover:text-black px-1">No</button>
+          <div className="flex items-center gap-0.5 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 border border-black/10">
+            <button onClick={() => { onRemove(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+            {onDelete && <button onClick={() => { onDelete(); setConfirming(false) }} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1 transition-colors">Delete</button>}
+            <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
           </div>
         ) : (
           <button onClick={() => setConfirming(true)}

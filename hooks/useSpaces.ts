@@ -216,11 +216,11 @@ export function useSpaces() {
     persist(`/api/db/lists/${spaceId}`, 'PATCH', { items, updatedAt })
   }, [patchSpace])
 
-  const addPost = useCallback((spaceId: string, post: Post) => {
+  const addPost = useCallback((spaceId: string, post: Post, extra?: { sourceRef?: string; cardRef?: string }) => {
     const id = makeItemId()
     mutateItems(spaceId, (items) => [
       ...items,
-      { type: 'post' as const, id, copyGroupId: id, refId: post.id, postData: post, addedAt: Date.now() },
+      { type: 'post' as const, id, copyGroupId: id, refId: post.id, postData: post, addedAt: Date.now(), ...extra },
     ])
   }, [mutateItems])
 

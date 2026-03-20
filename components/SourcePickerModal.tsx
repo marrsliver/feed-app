@@ -94,9 +94,27 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
   const [newUrl, setNewUrl] = useState('')
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState('')
+  const [duplicateOf, setDuplicateOf] = useState<string | null>(null)
+  const [pendingAdd, setPendingAdd] = useState<{ url: string; feedUrl: string; title: string } | null>(null)
   const newUrlRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (addingNew) newUrlRef.current?.focus() }, [addingNew])
+
+  function findDuplicate(url: string, feedUrl: string): string | null {
+    const norm = (u: string) => u.replace(/\/$/, '').toLowerCase()
+    const match = sources.find(s =>
+      (url && norm(s.url) === norm(url)) ||
+      (feedUrl && s.feedUrl && norm(s.feedUrl) === norm(feedUrl))
+    )
+    return match?.name ?? null
+  }
+
+  function commitAdd(url: string, feedUrl: string, title: string) {
+    const id = `user-${Date.now()}`
+    addSource({ id, name: title || new URL(url).hostname.replace(/^www\./, ''), url, feedUrl, type: 'rss', inFeed: true, feedGroup: 'user' })
+    onSelect(id)
+    onClose()
+  }
 
   async function handleAddNew() {
     const url = newUrl.trim()
@@ -111,18 +129,16 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
       })
       const data = await res.json()
       if (!res.ok || data.error) { setDetectError(data.error ?? 'Could not detect feed'); setDetecting(false); return }
-      const id = `user-${Date.now()}`
-      addSource({
-        id,
-        name: data.title || new URL(url).hostname.replace(/^www\./, ''),
-        url,
-        feedUrl: data.feedUrl ?? url,
-        type: 'rss',
-        inFeed: true,
-        feedGroup: 'user',
-      })
-      onSelect(id)
-      onClose()
+      const resolvedFeedUrl = data.feedUrl ?? url
+      const title = data.title || new URL(url).hostname.replace(/^www\./, '')
+      const dup = findDuplicate(url, resolvedFeedUrl)
+      if (dup) {
+        setPendingAdd({ url, feedUrl: resolvedFeedUrl, title })
+        setDuplicateOf(dup)
+        setDetecting(false)
+        return
+      }
+      commitAdd(url, resolvedFeedUrl, title)
     } catch {
       setDetectError('Network error — please try again')
     }
@@ -231,7 +247,22 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
 
           {/* Add new source footer */}
           <div className="border-t border-black/10 shrink-0">
-            {addingNew ? (
+            {duplicateOf && pendingAdd ? (
+              <div className="px-3 py-2.5 space-y-2 bg-amber-50 border-t border-amber-200">
+                <p className="text-[11px] text-amber-800 font-medium">Already in your library</p>
+                <p className="text-[10px] text-amber-700">"{duplicateOf}" has the same URL. Add as duplicate?</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => { commitAdd(pendingAdd.url, pendingAdd.feedUrl, pendingAdd.title) }}
+                    className="text-[11px] bg-amber-700 text-white px-2.5 py-1 hover:bg-amber-800 transition-colors">
+                    Add anyway
+                  </button>
+                  <button onClick={() => { setDuplicateOf(null); setPendingAdd(null); setNewUrl(''); setAddingNew(false) }}
+                    className="text-[11px] text-black/40 hover:text-black px-2 py-1 transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : addingNew ? (
               <div className="px-3 py-2.5 space-y-1.5">
                 <input
                   ref={newUrlRef}

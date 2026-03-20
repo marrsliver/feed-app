@@ -9,8 +9,19 @@ function engagementScore(commentCount: number): number {
   return Math.log1p(commentCount) / Math.log1p(1000)
 }
 
-// Engagement × diversity only (no recency), greedy spread
-export function rankPostsDiversified(posts: Post[]): Post[] {
+// Simple seeded LCG random — deterministic per seed
+function seededRandom(seed: number): () => number {
+  let s = seed >>> 0
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0
+    return s / 0x100000000
+  }
+}
+
+// Engagement × diversity only (no recency), greedy spread.
+// Optional seed: when provided, applies a seeded Fisher-Yates shuffle to the result
+// so each seed value produces a distinct stable ordering.
+export function rankPostsDiversified(posts: Post[], seed?: number): Post[] {
   if (posts.length === 0) return posts
 
   const sourceCounts: Record<string, number> = {}
@@ -34,6 +45,15 @@ export function rankPostsDiversified(posts: Post[]): Post[] {
     if (idx === -1) idx = 0
     result.push(remaining.splice(idx, 1)[0].post)
   }
+
+  if (seed !== undefined) {
+    const rand = seededRandom(seed)
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]]
+    }
+  }
+
   return result
 }
 

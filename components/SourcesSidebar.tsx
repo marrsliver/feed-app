@@ -175,6 +175,8 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
   const [newCategoryName, setNewCategoryName] = useState('')
   const [creatingIndustry, setCreatingIndustry] = useState(false)
   const [newIndustryName, setNewIndustryName] = useState('')
+  const [confirmName, setConfirmName] = useState('')
+  const [duplicateOf, setDuplicateOf] = useState<string | null>(null) // name of existing duplicate source
   const [tab, setTab] = useState<TabView>('library')
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
@@ -190,6 +192,12 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 50)
   }, [])
+
+  useEffect(() => {
+    if (detect.status === 'confirm' || detect.status === 'no-feed') {
+      setConfirmName((detect as { title: string }).title)
+    }
+  }, [detect.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEscape = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose()
@@ -240,11 +248,26 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
     }
   }
 
-  function handleAdd(inFeed: boolean) {
+  function findDuplicate(url: string, feedUrl: string): string | null {
+    const allExisting = [...libraryStaticSources, ...userSources]
+    const norm = (u: string) => u.replace(/\/$/, '').toLowerCase()
+    const match = allExisting.find(s =>
+      (url && norm(s.url) === norm(url)) ||
+      (feedUrl && s.feedUrl && norm(s.feedUrl) === norm(feedUrl))
+    )
+    return match?.name ?? null
+  }
+
+  function handleAdd(inFeed: boolean, force = false) {
     if (detect.status !== 'confirm') return
+    if (!force) {
+      const dup = findDuplicate(detect.siteUrl, detect.feedUrl)
+      if (dup) { setDuplicateOf(dup); return }
+    }
+    setDuplicateOf(null)
     onAddSource({
       id: `user-${Date.now()}`,
-      name: detect.title,
+      name: confirmName.trim() || detect.title,
       url: detect.siteUrl,
       feedUrl: detect.feedUrl,
       type: 'rss',
@@ -259,11 +282,16 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
     setSelectedIndustryId('')
   }
 
-  function handleAddLibraryOnly() {
+  function handleAddLibraryOnly(force = false) {
     if (detect.status !== 'no-feed') return
+    if (!force) {
+      const dup = findDuplicate(detect.siteUrl, '')
+      if (dup) { setDuplicateOf(dup); return }
+    }
+    setDuplicateOf(null)
     onAddSource({
       id: `user-${Date.now()}`,
-      name: detect.title,
+      name: confirmName.trim() || detect.title,
       url: detect.siteUrl,
       feedUrl: '',
       type: 'rss',
@@ -430,6 +458,16 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 <p className="font-medium text-black truncate">{detect.title}</p>
                 <p className="text-[10px] text-black/40 mt-0.5">No RSS feed found</p>
               </div>
+              {/* Editable name */}
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Name</p>
+                <input
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors"
+                  placeholder="Source name"
+                />
+              </div>
               <p className="text-[10px] text-black/50">You can still save this site to your Library for reference — it won&apos;t appear in your feed.</p>
               {/* Industry */}
               <div className="space-y-1">
@@ -475,14 +513,26 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                   </div>
                 )}
               </div>
-              <div className="flex flex-col gap-1.5">
-                <button onClick={handleAddLibraryOnly} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
-                  <BookOpen size={11} /> Add to Library Only
-                </button>
-                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
-                  Cancel
-                </button>
-              </div>
+              {duplicateOf && (
+                <div className="bg-amber-50 border border-amber-200 px-3 py-2 space-y-2">
+                  <p className="text-[11px] text-amber-800 font-medium">⚠ Already in your library</p>
+                  <p className="text-[10px] text-amber-700">&ldquo;{duplicateOf}&rdquo; has the same URL. Add as duplicate?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleAddLibraryOnly(true)} className="text-[10px] font-medium text-amber-900 hover:text-black border border-amber-300 px-2 py-1 hover:border-black/40 transition-colors">Add anyway</button>
+                    <button onClick={() => setDuplicateOf(null)} className="text-[10px] text-black/30 hover:text-black ml-auto transition-colors">Cancel</button>
+                  </div>
+                </div>
+              )}
+              {!duplicateOf && (
+                <div className="flex flex-col gap-1.5">
+                  <button onClick={() => handleAddLibraryOnly()} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
+                    <BookOpen size={11} /> Add to Library Only
+                  </button>
+                  <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           ) : detect.status === 'confirm' ? (
             <div className="space-y-3">
@@ -490,6 +540,17 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
               <div className="px-3 py-2 bg-black/5 text-sm">
                 <p className="font-medium text-black truncate">{detect.title}</p>
                 <p className="text-[10px] text-black/40 truncate mt-0.5">{detect.feedUrl}</p>
+              </div>
+
+              {/* Editable name */}
+              <div className="space-y-1">
+                <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Name</p>
+                <input
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                  className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors"
+                  placeholder="Source name"
+                />
               </div>
 
               {/* Industry */}
@@ -543,18 +604,33 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                 )}
               </div>
 
-              <p className="text-[10px] text-black/40">How would you like to add this?</p>
-              <div className="flex flex-col gap-1.5">
-                <button onClick={() => handleAdd(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
-                  <Rss size={11} /> Add to feed
-                </button>
-                <button onClick={() => handleAdd(false)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-black/20 text-black/60 hover:text-black hover:border-black/40 transition-colors">
-                  <BookOpen size={11} /> Save to list only
-                </button>
-                <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
-                  Cancel
-                </button>
-              </div>
+              {duplicateOf && (
+                <div className="bg-amber-50 border border-amber-200 px-3 py-2 space-y-2">
+                  <p className="text-[11px] text-amber-800 font-medium">⚠ Already in your library</p>
+                  <p className="text-[10px] text-amber-700">&ldquo;{duplicateOf}&rdquo; has the same URL. Add as duplicate?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleAdd(true, true)} className="text-[10px] font-medium text-amber-900 hover:text-black border border-amber-300 px-2 py-1 hover:border-black/40 transition-colors">Add to feed anyway</button>
+                    <button onClick={() => handleAdd(false, true)} className="text-[10px] text-amber-700 hover:text-black px-1 transition-colors">Library only</button>
+                    <button onClick={() => setDuplicateOf(null)} className="text-[10px] text-black/30 hover:text-black ml-auto transition-colors">Cancel</button>
+                  </div>
+                </div>
+              )}
+              {!duplicateOf && (
+                <>
+                  <p className="text-[10px] text-black/40">How would you like to add this?</p>
+                  <div className="flex flex-col gap-1.5">
+                    <button onClick={() => handleAdd(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors">
+                      <Rss size={11} /> Add to feed
+                    </button>
+                    <button onClick={() => handleAdd(false)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium border border-black/20 text-black/60 hover:text-black hover:border-black/40 transition-colors">
+                      <BookOpen size={11} /> Save to list only
+                    </button>
+                    <button onClick={() => setDetect({ status: 'idle' })} className="text-xs text-black/30 hover:text-black transition-colors text-center py-1">
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-2">

@@ -34,7 +34,9 @@ export interface LibrarySource {
   categoryId?: string
   industryId?: string
   tags: string[]
+  summary?: string
   cards?: SourceCard[]
+  associations?: string[]  // IDs of other sources this source is associated with
 }
 
 // Aliases for transition compatibility
@@ -80,7 +82,7 @@ export interface Comment {
   createdAt: number
 }
 
-export type SpaceItemType = 'post' | 'note' | 'source' | 'space' | 'media'
+export type SpaceItemType = 'post' | 'note' | 'source' | 'space' | 'media' | 'divider' | 'text'
 
 export interface SpaceItemVersion {
   content: string
@@ -103,6 +105,8 @@ export interface SpaceItem {
   postRef?: Post                // post back-ref (notes from article panels)
   copyGroupId?: string          // shared across copies; used for "appears in" lookup
   versions?: SpaceItemVersion[] // edit history for notes
+  posX?: number               // absolute x position for floating text items
+  posY?: number               // absolute y position for floating text items
   addedAt: number
 }
 
@@ -121,3 +125,11 @@ export interface Space {
 }
 
 export type SavedList = Space
+
+export interface SpaceFolder {
+  id: string
+  name: string
+  spaceIds: string[]
+  createdAt: number
+  deletedAt?: number
+}

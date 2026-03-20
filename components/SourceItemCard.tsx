@@ -8,10 +8,11 @@ interface Props {
   item: SpaceItem
   source?: LibrarySource
   onRemove: () => void
+  onDelete?: () => void
   onOpenSource?: (source: LibrarySource) => void
 }
 
-export function SourceItemCard({ item, source, onRemove, onOpenSource }: Props) {
+export function SourceItemCard({ item, source, onRemove, onDelete, onOpenSource }: Props) {
   const [confirming, setConfirming] = useState(false)
   const name = source?.name ?? item.refId ?? 'Unknown source'
   const url = source?.url ?? ''
@@ -52,10 +53,10 @@ export function SourceItemCard({ item, source, onRemove, onOpenSource }: Props) 
           </div>
 
           {confirming ? (
-            <div className="flex items-center gap-1 shrink-0 mt-0.5">
-              <span className="text-[10px] text-black/40">Remove?</span>
-              <button onClick={onRemove} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1">Yes</button>
-              <button onClick={() => setConfirming(false)} className="text-[10px] text-black/40 hover:text-black px-1">No</button>
+            <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+              <button onClick={() => { onRemove(); setConfirming(false) }} className="text-[10px] text-black/50 hover:text-black font-medium px-1 transition-colors">Remove</button>
+              {onDelete && <button onClick={() => { onDelete(); setConfirming(false) }} className="text-[10px] text-red-500 hover:text-red-700 font-medium px-1 transition-colors">Delete</button>}
+              <button onClick={() => setConfirming(false)} className="text-[10px] text-black/30 hover:text-black/60 px-0.5 transition-colors leading-none">×</button>
             </div>
           ) : (
             <button

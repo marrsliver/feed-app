@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { X, ArrowUpRight, Trash2, Pencil, Check, ArrowLeftRight, Link2, FolderPlus, Database, ChevronRight, Plus, ChevronLeft } from 'lucide-react'
+import { X, ArrowUpRight, Trash2, Pencil, Check, ArrowLeftRight, Link2, FolderPlus, Database, ChevronRight, ChevronDown, Plus, ChevronLeft } from 'lucide-react'
 import type { Post } from '@/lib/types'
 import { useComments } from '@/hooks/useComments'
 import { useKnowledgeGraph } from '@/hooks/useKnowledgeGraph'
@@ -27,6 +27,9 @@ interface Props {
   savedInSpaces?: { id: string; name: string }[]
   onSavedToSpace?: (post: Post) => void
   commentToSpaces?: Record<string, { id: string; name: string }[]>
+  onSavePostToSpace?: (spaceId: string) => void
+  onCreateSpaceForPost?: (name: string) => void
+  onCreateSpaceForNote?: (name: string) => string
 }
 
 function formatDate(dateStr: string): string {
@@ -160,7 +163,7 @@ function NoteRow({
   )
 }
 
-export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces, onSavedToSpace, commentToSpaces }: Props) {
+export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onAddNoteToSpaceId, allSpaces, onConnectToSource, onNavigateToSpace, onBack, onClose, inline, onCreateSpace, savedInSpaces, onSavedToSpace, commentToSpaces, onSavePostToSpace, onCreateSpaceForPost, onCreateSpaceForNote }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getPostSpaces } = useKnowledgeGraph()
   const isManual = post.sourceId === 'manual'
@@ -173,6 +176,11 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
   const [copied, setCopied] = useState(false)
   const [spacePickNote, setSpacePickNote] = useState<{ text: string; commentId?: string } | null>(null)
   const [newSpaceName, setNewSpaceName] = useState('')
+  const [noteSpaceId, setNoteSpaceId] = useState<string | null>(null)
+  const [noteSpacePickerOpen, setNoteSpacePickerOpen] = useState(false)
+  const [noteNewSpaceName, setNoteNewSpaceName] = useState('')
+  const [articleSpacePickerOpen, setArticleSpacePickerOpen] = useState(false)
+  const [articleNewSpaceName, setArticleNewSpaceName] = useState('')
 
   // Determine what "add to space" does for NoteRow — space picker if allSpaces provided, else direct
   const noteAddToSpace = allSpaces && onAddNoteToSpaceId
@@ -200,8 +208,12 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
 
   function handleSubmit() {
     if (!draft.trim()) return
-    addComment(post.id, draft)
+    const commentId = addComment(post.id, draft)
+    if (noteSpaceId) {
+      onAddNoteToSpaceId?.(draft, noteSpaceId, commentId)
+    }
     setDraft('')
+    setNoteSpaceId(null)
   }
 
   return (
@@ -262,6 +274,56 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
                   setSpacePickNote(null)
                 }}
                 disabled={!newSpaceName.trim()}
+                className="text-xs bg-black text-white px-2 py-1.5 hover:bg-black/80 transition-colors disabled:opacity-30 flex items-center"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Article space picker overlay */}
+        {articleSpacePickerOpen && allSpaces && (
+          <div className="absolute inset-0 bg-white z-20 flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 shrink-0">
+              <span className="text-sm font-semibold">Save article to space</span>
+              <button onClick={() => setArticleSpacePickerOpen(false)} className="text-black/30 hover:text-black p-0.5 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto py-1">
+              {allSpaces.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => { onSavePostToSpace?.(s.id); setArticleSpacePickerOpen(false) }}
+                  className="w-full text-left px-5 py-3 text-sm hover:bg-black/5 transition-colors flex items-center gap-2"
+                >
+                  <ChevronRight size={11} className="text-black/25" />
+                  {s.name}
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-black/10 px-3 py-2 flex gap-2 shrink-0">
+              <input
+                value={articleNewSpaceName}
+                onChange={(e) => setArticleNewSpaceName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && articleNewSpaceName.trim()) {
+                    onCreateSpaceForPost?.(articleNewSpaceName.trim())
+                    setArticleNewSpaceName('')
+                    setArticleSpacePickerOpen(false)
+                  }
+                }}
+                placeholder="New space name…"
+                className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+              />
+              <button
+                onClick={() => {
+                  if (!articleNewSpaceName.trim()) return
+                  onCreateSpaceForPost?.(articleNewSpaceName.trim())
+                  setArticleNewSpaceName('')
+                  setArticleSpacePickerOpen(false)
+                }}
+                disabled={!articleNewSpaceName.trim()}
                 className="text-xs bg-black text-white px-2 py-1.5 hover:bg-black/80 transition-colors disabled:opacity-30 flex items-center"
               >
                 <Plus size={12} />
@@ -335,9 +397,9 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
               </p>
             )}
 
-            {/* Space badges */}
-            {displaySpaces.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+            {/* Space badges + save to space */}
+            {(displaySpaces.length > 0 || (allSpaces && (onSavePostToSpace || onCreateSpaceForPost))) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {displaySpaces.map((s) => (
                   <button
                     key={s.id}
@@ -348,6 +410,14 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
                     {s.name}
                   </button>
                 ))}
+                {allSpaces && (onSavePostToSpace || onCreateSpaceForPost) && (
+                  <button
+                    onClick={() => setArticleSpacePickerOpen(true)}
+                    className="text-[9px] text-black/30 hover:text-black/60 border border-black/12 px-1.5 py-0.5 transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={9} />Save to space
+                  </button>
+                )}
               </div>
             )}
 
@@ -446,7 +516,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
             )}
 
             {/* New comment input */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -458,6 +528,65 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
                 rows={3}
                 className="w-full text-sm border border-black/15 px-3 py-2.5 resize-none outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
               />
+              {/* Note-to-space selector */}
+              {allSpaces && (
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setNoteSpacePickerOpen((v) => !v)}
+                      className="flex items-center gap-1 text-[9px] text-black/35 hover:text-black/60 transition-colors"
+                    >
+                      <FolderPlus size={9} />
+                      {noteSpaceId ? allSpaces.find((s) => s.id === noteSpaceId)?.name ?? 'No space' : 'No space'}
+                      <ChevronDown size={8} />
+                    </button>
+                    {noteSpaceId && (
+                      <button onClick={() => setNoteSpaceId(null)} className="text-black/25 hover:text-black/50 leading-none text-sm">×</button>
+                    )}
+                  </div>
+                  {noteSpacePickerOpen && (
+                    <div className="absolute left-0 top-full mt-0.5 z-10 border border-black/10 bg-white shadow-sm w-48">
+                      <div className="max-h-32 overflow-y-auto py-0.5">
+                        {allSpaces.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => { setNoteSpaceId(s.id); setNoteSpacePickerOpen(false) }}
+                            className="w-full text-left px-2.5 py-1.5 text-[10px] hover:bg-black/5 transition-colors flex items-center gap-1.5"
+                          >
+                            <ChevronRight size={9} className="text-black/25" />
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t border-black/10 px-2 py-1.5 flex gap-1.5">
+                        <input
+                          value={noteNewSpaceName}
+                          onChange={(e) => setNoteNewSpaceName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && noteNewSpaceName.trim()) {
+                              const id = onCreateSpaceForNote?.(noteNewSpaceName.trim())
+                              if (id) { setNoteSpaceId(id); setNoteSpacePickerOpen(false); setNoteNewSpaceName('') }
+                            }
+                          }}
+                          placeholder="New space…"
+                          className="flex-1 text-[10px] border border-black/15 px-1.5 py-1 outline-none focus:border-black/40 placeholder:text-black/25"
+                        />
+                        <button
+                          onClick={() => {
+                            if (!noteNewSpaceName.trim()) return
+                            const id = onCreateSpaceForNote?.(noteNewSpaceName.trim())
+                            if (id) { setNoteSpaceId(id); setNoteSpacePickerOpen(false); setNoteNewSpaceName('') }
+                          }}
+                          disabled={!noteNewSpaceName.trim()}
+                          className="text-[10px] bg-black text-white px-2 py-1 disabled:opacity-30 flex items-center"
+                        >
+                          <Plus size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-[9px] text-black/25">⌘ + Enter to save</span>
                 <button

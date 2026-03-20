@@ -144,9 +144,15 @@ interface Props {
   onAddSourceToSpace?: (spaceId: string) => void
   allSpaces?: { id: string; name: string }[]
   commentToSpaces?: Record<string, { id: string; name: string }[]>
+  onSetSummary?: (id: string, summary: string) => void
+  onAddPieceToSpace?: (spaceId: string, card: SourceCard) => void
+  allLibrarySources?: LibrarySource[]
+  onAddAssociation?: (targetId: string) => void
+  onRemoveAssociation?: (targetId: string) => void
+  onOpenAssociation?: (source: LibrarySource) => void
 }
 
-export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces }: Props) {
+export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces, onSetSummary, onAddPieceToSpace, allLibrarySources, onAddAssociation, onRemoveAssociation, onOpenAssociation }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getSourceConnections } = useKnowledgeGraph()
   const connections = getSourceConnections(source.id)
@@ -172,10 +178,16 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   const [openPiecePost, setOpenPiecePost] = useState<Post | null>(null)
   const [expandedPieceId, setExpandedPieceId] = useState<string | null>(null)
   const [addToSpacePickerOpen, setAddToSpacePickerOpen] = useState(false)
+  const [addToSpaceSearch, setAddToSpaceSearch] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
-  const [piecesOpen, setPiecesOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(() => comments.length > 0)
+  const [piecesOpen, setPiecesOpen] = useState(() => (source.cards ?? []).length > 0)
   const [inSpacesOpen, setInSpacesOpen] = useState(false)
+  const [assocPickerOpen, setAssocPickerOpen] = useState(false)
+  const [assocSearch, setAssocSearch] = useState('')
+  const [summaryValue, setSummaryValue] = useState(source.summary ?? '')
+  const [pieceToSpaceCard, setPieceToSpaceCard] = useState<SourceCard | null>(null)
+  const [pieceToSpaceSearch, setPieceToSpaceSearch] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
   const newIndustryRef = useRef<HTMLInputElement>(null)
@@ -187,6 +199,8 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   useEffect(() => {
     if (!editingName) setNameValue(source.name)
   }, [source.name, editingName])
+
+  useEffect(() => { setSummaryValue(source.summary ?? '') }, [source.summary])
 
   function handleSaveRename() {
     const trimmed = nameValue.trim()
@@ -370,6 +384,20 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
               )}
             </div>
 
+            {/* Summary */}
+            <textarea
+              value={summaryValue}
+              onChange={(e) => setSummaryValue(e.target.value)}
+              onBlur={() => {
+                const v = summaryValue.trim()
+                if (v !== (source.summary ?? '')) onSetSummary?.(source.id, v)
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+              placeholder="Add a one-line summary…"
+              rows={2}
+              className="w-full text-xs text-black/60 resize-none outline-none placeholder:text-black/20 bg-transparent leading-relaxed border-b border-transparent focus:border-black/15 transition-colors"
+            />
+
             {/* Feed status + open */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] px-1.5 py-0.5 border ${source.inFeed ? 'border-black/20 text-black/50' : 'border-black/10 text-black/25'}`}>
@@ -385,6 +413,80 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                 <ArrowUpRight size={13} />
               </a>
             </div>
+
+            {/* Associations — always flat, no collapsible */}
+            {(onAddAssociation || (source.associations ?? []).length > 0) && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
+                    Associations
+                  </label>
+                  {onAddAssociation && (
+                    <button
+                      onClick={() => { setAssocPickerOpen(v => !v); setAssocSearch('') }}
+                      className="text-[9px] text-black/30 hover:text-black transition-colors flex items-center gap-0.5"
+                    >
+                      <Plus size={9} />Add
+                    </button>
+                  )}
+                </div>
+                {(source.associations ?? []).length === 0 && !assocPickerOpen && (
+                  <p className="text-[10px] text-black/25">No associations</p>
+                )}
+                {(source.associations ?? []).length > 0 && (
+                  <div className="space-y-1">
+                    {(source.associations ?? []).map((targetId) => {
+                      const target = allLibrarySources?.find(s => s.id === targetId)
+                      if (!target) return null
+                      return (
+                        <div key={targetId} className="flex items-center gap-2 group/assoc">
+                          <button
+                            onClick={() => onOpenAssociation?.(target)}
+                            className="flex items-center gap-1.5 text-xs text-black/60 hover:text-black transition-colors flex-1 text-left"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: target.color }} />
+                            {target.name}
+                          </button>
+                          {onRemoveAssociation && (
+                            <button
+                              onClick={() => onRemoveAssociation(targetId)}
+                              className="text-black/20 hover:text-black/60 transition-colors opacity-0 group-hover/assoc:opacity-100"
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {assocPickerOpen && allLibrarySources && (
+                  <div className="space-y-1">
+                    <input
+                      value={assocSearch}
+                      onChange={(e) => setAssocSearch(e.target.value)}
+                      placeholder="Search sources…"
+                      autoFocus
+                      className="w-full text-xs border border-black/20 px-2 py-1.5 outline-none focus:border-black/40 transition-colors"
+                    />
+                    <div className="border border-black/10 bg-white max-h-36 overflow-y-auto">
+                      {allLibrarySources
+                        .filter(s => s.id !== source.id && !(source.associations ?? []).includes(s.id) && s.name.toLowerCase().includes(assocSearch.toLowerCase()))
+                        .map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => { onAddAssociation!(s.id); setAssocPickerOpen(false); setAssocSearch('') }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 transition-colors text-black/70 flex items-center gap-2"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                            {s.name}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Industry selector */}
             {(industries.length > 0 || onCreateIndustry) && (
@@ -581,7 +683,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
             {sourceLists && (
               <div className="space-y-2">
                 <label className="text-[9px] font-semibold uppercase tracking-[0.15em] text-black/40">
-                  Lists
+                  Groups
                 </label>
                 {/* Current memberships */}
                 {sourceLists.filter(l => l.sourceIds.includes(source.id)).length > 0 && (
@@ -638,7 +740,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                           if (e.key === 'Escape') { setAddingList(false); setNewListName('') }
                         }}
                         autoFocus
-                        placeholder="New list name…"
+                        placeholder="New group name…"
                         className="flex-1 text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
                       />
                       <button
@@ -655,7 +757,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                     className="text-[10px] text-black/30 hover:text-black transition-colors flex items-center gap-1"
                   >
                     <Plus size={10} />
-                    Add to list
+                    Add to group
                   </button>
                 )}
               </div>
@@ -847,6 +949,15 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                                   <ExternalLink size={12} />
                                 </a>
                               )}
+                              {onAddPieceToSpace && allSpaces && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setPieceToSpaceCard(pieceToSpaceCard?.id === card.id ? null : card); setPieceToSpaceSearch('') }}
+                                  className="p-1 text-black/20 hover:text-black/60 transition-colors opacity-0 group-hover:opacity-100"
+                                  aria-label="Add to space"
+                                >
+                                  <FolderPlus size={12} />
+                                </button>
+                              )}
                               {onRemoveSourceCard && (
                                 <button
                                   onClick={() => setConfirmRemovePieceId(card.id)}
@@ -861,6 +972,33 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {pieceToSpaceCard && piecesOpen && onAddPieceToSpace && allSpaces && (
+                  <div className="mt-2 space-y-1 border border-black/10 p-2 bg-black/[0.01]">
+                    <p className="text-[9px] text-black/40 mb-1">Add &ldquo;{pieceToSpaceCard.title}&rdquo; to space:</p>
+                    <input
+                      value={pieceToSpaceSearch}
+                      onChange={(e) => setPieceToSpaceSearch(e.target.value)}
+                      placeholder="Search spaces…"
+                      autoFocus
+                      className="w-full text-xs border border-black/15 px-2 py-1 outline-none focus:border-black/40"
+                    />
+                    <div className="border border-black/10 bg-white max-h-32 overflow-y-auto">
+                      {allSpaces
+                        .filter(s => s.name.toLowerCase().includes(pieceToSpaceSearch.toLowerCase()))
+                        .map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => { onAddPieceToSpace!(s.id, pieceToSpaceCard!); setPieceToSpaceCard(null); setPieceToSpaceSearch('') }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 text-black/70"
+                          >
+                            {s.name}
+                          </button>
+                        ))}
+                    </div>
+                    <button onClick={() => { setPieceToSpaceCard(null); setPieceToSpaceSearch('') }} className="text-[9px] text-black/30 hover:text-black transition-colors">Cancel</button>
                   </div>
                 )}
 
@@ -896,16 +1034,27 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
               {inSpacesOpen && (
                 <div className="space-y-3 pb-2">
                   {addToSpacePickerOpen && allSpaces && onAddSourceToSpace && (
-                    <div className="border border-black/10 bg-white py-1">
-                      {allSpaces.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => { onAddSourceToSpace(s.id); setAddToSpacePickerOpen(false) }}
-                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 transition-colors text-black/70"
-                        >
-                          {s.name}
-                        </button>
-                      ))}
+                    <div className="space-y-1">
+                      <input
+                        value={addToSpaceSearch}
+                        onChange={(e) => setAddToSpaceSearch(e.target.value)}
+                        placeholder="Search spaces…"
+                        autoFocus
+                        className="w-full text-xs border border-black/20 px-2 py-1.5 outline-none focus:border-black/40 transition-colors"
+                      />
+                      <div className="border border-black/10 bg-white max-h-36 overflow-y-auto">
+                        {allSpaces
+                          .filter(s => s.name.toLowerCase().includes(addToSpaceSearch.toLowerCase()))
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => { onAddSourceToSpace(s.id); setAddToSpacePickerOpen(false); setAddToSpaceSearch('') }}
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-black/5 transition-colors text-black/70"
+                            >
+                              {s.name}
+                            </button>
+                          ))}
+                      </div>
                     </div>
                   )}
 

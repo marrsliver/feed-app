@@ -189,7 +189,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     setSourceOpenedFromPost(false)
   }
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
-  const [isRandomized, setIsRandomized] = useState(false)
+  const [shuffleSeed, setShuffleSeed] = useState<number | null>(null)
   const [selectSourcesOpen, setSelectSourcesOpen] = useState(false)
   const { isRead, markRead } = useReadPosts()
 
@@ -218,12 +218,15 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     removeTag,
     addSourceCard,
     removeSourceCard,
+    addAssociation,
+    removeAssociation,
+    setSummary,
   } = useLibrarySources()
 
   const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
-  const { spaces, lists, createSpace, createList, deleteList, renameList, addNote } = useSpaces()
+  const { spaces, lists, createSpace, createList, deleteList, renameList, addNote, addPost: addPostToSpace } = useSpaces()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
   const { deletedPosts, hiddenIds, archivePost, restorePost } = useDeletedPosts()
@@ -347,7 +350,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
     .filter((p) => !hiddenIds.includes(p.id))
     .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
-  const allPosts = isRandomized ? rankPostsDiversified(filtered) : rankPosts(filtered)
+  const allPosts = shuffleSeed !== null ? rankPostsDiversified(filtered, shuffleSeed) : rankPosts(filtered)
   const activeList = lists.find((l) => l.id === view)
   const listFiltered =
     view === 'all'
@@ -472,13 +475,13 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
 
             {/* Shuffle */}
             <button
-              onClick={() => setIsRandomized(v => !v)}
+              onClick={() => setShuffleSeed(s => s !== null ? null : Date.now())}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors ${
-                isRandomized
+                shuffleSeed !== null
                   ? 'bg-black text-white border-black'
                   : 'border-black/15 text-black/50 hover:border-black/40 hover:text-black'
               }`}
-              title="Remove recency bias from ranking"
+              title="Shuffle feed order — click again to reshuffle"
             >
               <Shuffle size={12} />
               Shuffle
@@ -535,7 +538,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-black/15 text-black/50 hover:border-black/40 hover:text-black transition-colors"
               >
                 <BookmarkIcon size={12} />
-                Lists
+                Spaces
               </button>
             )}
           </div>
@@ -757,6 +760,25 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         onCreateSpace={(name, noteContent, commentId) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId }) }}
         onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
         commentToSpaces={commentToSpaces}
+        onSavePostToSpace={(spaceId) => {
+          if (!openPost) return
+          const already = spaces.find((s) => s.id === spaceId)?.items.some((i) => i.type === 'post' && i.refId === openPost.id)
+          if (!already) {
+            const sourceRef = openPost.sourceId !== 'manual' ? openPost.sourceId : undefined
+            addPostToSpace(spaceId, openPost, { sourceRef, cardRef: sourceRef ? openPost.id : undefined })
+            if (sourceRef) addSourceCard(sourceRef, { id: openPost.id, url: openPost.url, title: openPost.title, addedAt: Date.now() })
+          }
+        }}
+        onCreateSpaceForPost={(name) => {
+          if (!openPost) return
+          const id = createSpace(name)
+          const sourceRef = openPost.sourceId !== 'manual' ? openPost.sourceId : undefined
+          addPostToSpace(id, openPost, { sourceRef, cardRef: sourceRef ? openPost.id : undefined })
+          if (sourceRef) addSourceCard(sourceRef, { id: openPost.id, url: openPost.url, title: openPost.title, addedAt: Date.now() })
+        }}
+        onCreateSpaceForNote={(name) => {
+          return createSpace(name)
+        }}
         onBack={handlePanelBack}
         onClose={handlePanelClose}
       />
@@ -792,6 +814,13 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           router.push(`/remix?space=${spaceId}`)
         }}
         onOpenPiece={(post) => openPostInline(post)}
+        allLibrarySources={allSources}
+        onAddAssociation={sidebarSelectedSourceId ? (targetId) => addAssociation(sidebarSelectedSourceId, targetId) : undefined}
+        onRemoveAssociation={sidebarSelectedSourceId ? (targetId) => removeAssociation(sidebarSelectedSourceId, targetId) : undefined}
+        onOpenAssociation={(src) => openSidebarSource(src.id)}
+        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
+        onSetSummary={setSummary}
+        onAddPieceToSpace={(spaceId, card) => { const source = sidebarSelectedSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
       />
     )}
     {sourcesCardsPanelSource && !sourcesCardsOpen && (
@@ -824,6 +853,13 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           router.push(`/remix?space=${spaceId}`)
         }}
         onOpenPiece={(post) => openPostInline(post)}
+        allLibrarySources={allSources}
+        onAddAssociation={sourcesCardsPanelId ? (targetId) => addAssociation(sourcesCardsPanelId, targetId) : undefined}
+        onRemoveAssociation={sourcesCardsPanelId ? (targetId) => removeAssociation(sourcesCardsPanelId, targetId) : undefined}
+        onOpenAssociation={(src) => openSourcesCardsPanel(src.id)}
+        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
+        onSetSummary={setSummary}
+        onAddPieceToSpace={(spaceId, card) => { const source = sourcesCardsPanelSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
       />
     )}
     </div>

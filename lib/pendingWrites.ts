@@ -77,7 +77,12 @@ export function clearAllWrites() {
 }
 
 export async function replayPendingWrites(): Promise<{ succeeded: number; failed: number }> {
-  const queue = load()
+  // Discard writes older than 2 hours — stale, and PATCH deduplication means any
+  // more-recent write to the same URL has already replaced their data.
+  const TWO_HOURS = 2 * 60 * 60 * 1000
+  const allWrites = load()
+  const queue = allWrites.filter((w) => Date.now() - w.queuedAt < TWO_HOURS)
+  if (queue.length < allWrites.length) save(queue)
   if (queue.length === 0) return { succeeded: 0, failed: 0 }
 
   let succeeded = 0
