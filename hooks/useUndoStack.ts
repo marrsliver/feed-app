@@ -1,19 +1,18 @@
 'use client'
-
-import { useEffect } from 'react'
-import { popUndo } from '@/lib/undoStack'
+import { useState, useEffect, useCallback } from 'react'
+import { peekUndo, popUndo, subscribeUndo } from '@/lib/undoStack'
 
 export function useUndoStack() {
+  const [top, setTop] = useState<{ label: string } | null>(() => peekUndo())
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        const tag = (e.target as HTMLElement).tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return
-        const action = popUndo()
-        if (action) { e.preventDefault(); action.undo() }
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return subscribeUndo(() => setTop(peekUndo()))
   }, [])
+
+  const undo = useCallback(() => {
+    const action = popUndo()
+    if (action) action.undo()
+  }, [])
+
+  return { canUndo: top !== null, undoLabel: top?.label ?? null, undo }
 }

@@ -29,6 +29,7 @@ import { useComments } from '@/hooks/useComments'
 import { useSourceItems } from '@/hooks/useSourceItems'
 import { usePanelStack } from '@/hooks/usePanelStack'
 import { pushUndo } from '@/lib/undoStack'
+import { UndoBar } from '@/components/UndoBar'
 import type { Space, SpaceItem, SpaceItemVersion, Post, LibrarySource, SpaceFolder } from '@/lib/types'
 
 // ── Appears-in badge ──────────────────────────────────────────────────────────
@@ -2266,6 +2267,7 @@ function RemixPageInner() {
           onClose={() => { setAddLinkOpen(false); setAddLinkSpaceId(null) }}
         />
       )}
+      <UndoBar />
     </main>
   )
 }

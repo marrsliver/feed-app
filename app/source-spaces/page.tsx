@@ -31,6 +31,7 @@ import { useSourceIndustries } from '@/hooks/useSourceIndustries'
 import { useComments } from '@/hooks/useComments'
 import { usePanelStack } from '@/hooks/usePanelStack'
 import { pushUndo } from '@/lib/undoStack'
+import { UndoBar } from '@/components/UndoBar'
 import type { SpaceItem, SpaceItemVersion, LibrarySource, Post, Space } from '@/lib/types'
 
 // ── Session storage helpers for sidebar state ────────────────────────────────
@@ -1223,6 +1224,7 @@ function SourceSpacesPageInner() {
           </div>
         </>
       )}
+      <UndoBar />
     </main>
   )
 }
