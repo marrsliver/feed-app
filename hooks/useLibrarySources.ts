@@ -136,9 +136,9 @@ export function useLibrarySources() {
     })
   }, [])
 
-  const addSource = useCallback((source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => {
+  const addSource = useCallback((source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>, force = false) => {
     updateSources((prev) => {
-      if (prev.some((s) => s.feedUrl && s.feedUrl === source.feedUrl)) return prev
+      if (!force && prev.some((s) => s.feedUrl && s.feedUrl === source.feedUrl)) return prev
       const userCount = prev.filter((s) => !s.isStatic).length
       const color = COLORS[userCount % COLORS.length]
       const addedAt = Date.now()

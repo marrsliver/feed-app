@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, FolderPlus, ExternalLink, FileText, Newspaper, Database, ChevronLeft, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, ArrowUpRight, Pencil, Check, Trash2, Plus, FolderPlus, ExternalLink, FileText, Newspaper, Database, ChevronLeft, ChevronDown, ChevronRight, Share2 } from 'lucide-react'
 import { useComments } from '@/hooks/useComments'
 import { useKnowledgeGraph } from '@/hooks/useKnowledgeGraph'
 import type { LibrarySource, SourceCategory, SourceIndustry, SourceList, Post, Space, SourceCard } from '@/lib/types'
@@ -150,9 +150,11 @@ interface Props {
   onAddAssociation?: (targetId: string) => void
   onRemoveAssociation?: (targetId: string) => void
   onOpenAssociation?: (source: LibrarySource) => void
+  onChangePieceSource?: (card: SourceCard) => void
+  onShowPieceOnAssociations?: (card: SourceCard, targetSourceIds: string[]) => void
 }
 
-export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces, onSetSummary, onAddPieceToSpace, allLibrarySources, onAddAssociation, onRemoveAssociation, onOpenAssociation }: Props) {
+export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces, onSetSummary, onAddPieceToSpace, allLibrarySources, onAddAssociation, onRemoveAssociation, onOpenAssociation, onChangePieceSource, onShowPieceOnAssociations }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getSourceConnections } = useKnowledgeGraph()
   const connections = getSourceConnections(source.id)
@@ -188,6 +190,9 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   const [summaryValue, setSummaryValue] = useState(source.summary ?? '')
   const [pieceToSpaceCard, setPieceToSpaceCard] = useState<SourceCard | null>(null)
   const [pieceToSpaceSearch, setPieceToSpaceSearch] = useState('')
+  const [pieceAssocCard, setPieceAssocCard] = useState<SourceCard | null>(null)
+  const [selectedAssocIds, setSelectedAssocIds] = useState<string[]>([])
+  const [pieceAssocConfirmed, setPieceAssocConfirmed] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const newCategoryRef = useRef<HTMLInputElement>(null)
   const newIndustryRef = useRef<HTMLInputElement>(null)
@@ -892,7 +897,8 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                 {piecesOpen && (source.cards ?? []).length > 0 && (
                   <div className="space-y-3">
                     {(source.cards ?? []).map((card) => (
-                      <div key={card.id} className="group flex items-start gap-2">
+                      <div key={card.id} className="space-y-1">
+                      <div className="group flex items-start gap-2">
                         <div
                           className="flex-1 min-w-0 space-y-0.5 cursor-pointer"
                           onClick={() => onOpenPiece ? onOpenPiece(pieceAsPost(card)) : setOpenPiecePost(pieceAsPost(card))}
@@ -958,6 +964,42 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                                   <FolderPlus size={12} />
                                 </button>
                               )}
+                              {onChangePieceSource && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onChangePieceSource(card) }}
+                                  className="p-1 text-black/20 hover:text-black/60 transition-colors opacity-0 group-hover:opacity-100"
+                                  aria-label="Change source"
+                                  title="Change source"
+                                >
+                                  <Database size={12} />
+                                </button>
+                              )}
+                              {onShowPieceOnAssociations && (source.associations ?? []).length > 0 && (
+                                pieceAssocConfirmed === card.id ? (
+                                  <span className="text-[10px] text-black/40 px-1">Added ✓</span>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (pieceAssocCard?.id === card.id) {
+                                        setPieceAssocCard(null)
+                                        setSelectedAssocIds([])
+                                      } else {
+                                        setPieceAssocCard(card)
+                                        const alreadyOn = (source.associations ?? []).filter(targetId =>
+                                          allLibrarySources?.find(s => s.id === targetId)?.cards?.some(c => c.id === card.id)
+                                        )
+                                        setSelectedAssocIds(alreadyOn)
+                                      }
+                                    }}
+                                    className="p-1 text-black/20 hover:text-black/60 transition-colors opacity-0 group-hover:opacity-100"
+                                    aria-label="Show on associations"
+                                    title="Show on associations"
+                                  >
+                                    <Share2 size={12} />
+                                  </button>
+                                )
+                              )}
                               {onRemoveSourceCard && (
                                 <button
                                   onClick={() => setConfirmRemovePieceId(card.id)}
@@ -970,6 +1012,47 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                             </>
                           )}
                         </div>
+                      </div>
+                      {/* Inline assoc picker — below the flex row */}
+                      {pieceAssocCard?.id === card.id && onShowPieceOnAssociations && (source.associations ?? []).length > 0 && (
+                        <div className="space-y-1.5 border border-black/10 p-2 bg-black/[0.01]">
+                          <p className="text-[9px] text-black/40 font-semibold uppercase tracking-widest">Show on associated sources</p>
+                          <div className="space-y-1">
+                            {(source.associations ?? []).map(targetId => {
+                              const target = allLibrarySources?.find(s => s.id === targetId)
+                              if (!target) return null
+                              return (
+                                <label key={targetId} className="flex items-center gap-2 text-xs text-black/60 cursor-pointer hover:text-black transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedAssocIds.includes(targetId)}
+                                    onChange={(e) => setSelectedAssocIds(prev => e.target.checked ? [...prev, targetId] : prev.filter(x => x !== targetId))}
+                                    className="accent-black"
+                                  />
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: target.color }} />
+                                  {target.name}
+                                </label>
+                              )
+                            })}
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => { onShowPieceOnAssociations(card, source.associations!); setPieceAssocCard(null); setSelectedAssocIds([]); setPieceAssocConfirmed(card.id); setTimeout(() => setPieceAssocConfirmed(null), 2000) }}
+                              className="text-[10px] text-black/50 hover:text-black transition-colors border border-black/15 px-2 py-0.5"
+                            >
+                              Show on all
+                            </button>
+                            <button
+                              onClick={() => { if (selectedAssocIds.length > 0) { onShowPieceOnAssociations(card, selectedAssocIds); setPieceAssocCard(null); setSelectedAssocIds([]); setPieceAssocConfirmed(card.id); setTimeout(() => setPieceAssocConfirmed(null), 2000) } }}
+                              disabled={selectedAssocIds.length === 0}
+                              className="text-[10px] text-black/50 hover:text-black transition-colors border border-black/15 px-2 py-0.5 disabled:opacity-30"
+                            >
+                              Confirm selected
+                            </button>
+                            <button onClick={() => { setPieceAssocCard(null); setSelectedAssocIds([]) }} className="text-[10px] text-black/30 hover:text-black transition-colors ml-auto">Cancel</button>
+                          </div>
+                        </div>
+                      )}
                       </div>
                     ))}
                   </div>

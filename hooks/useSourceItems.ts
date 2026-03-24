@@ -61,12 +61,46 @@ export function useSourceItems() {
     update((prev) => ({ ...prev, [sourceId]: items }))
   }, [update])
 
+  // Update matching items across ALL sources by copyGroupId
+  const updateItemByGroupId = useCallback((copyGroupId: string, updates: Partial<SpaceItem>) => {
+    update((prev) => {
+      const result: Record<string, SpaceItem[]> = {}
+      for (const [sid, items] of Object.entries(prev))
+        result[sid] = items.map(i => (i.copyGroupId ?? i.id) === copyGroupId ? { ...i, ...updates } : i)
+      return result
+    })
+  }, [update])
+
+  // Move an item between source-spaces
+  const moveItemToSource = useCallback((fromId: string, toId: string, itemId: string) => {
+    update((prev) => {
+      const item = (prev[fromId] ?? []).find(i => i.id === itemId)
+      if (!item) return prev
+      return {
+        ...prev,
+        [fromId]: (prev[fromId] ?? []).filter(i => i.id !== itemId),
+        [toId]: [...(prev[toId] ?? []), item],
+      }
+    })
+  }, [update])
+
+  // Which sourceIds contain an item with matching copyGroupId
+  const getSourcesContainingGroupId = useCallback((copyGroupId: string): string[] =>
+    Object.entries(allItems)
+      .filter(([, items]) => items.some(i => (i.copyGroupId ?? i.id) === copyGroupId))
+      .map(([sid]) => sid)
+  , [allItems])
+
   return {
+    allItems,
     getItems,
     appendItem,
     removeItem,
     updateItem,
     reorderItems,
     setAllItems: setAllItemsForSource,
+    updateItemByGroupId,
+    moveItemToSource,
+    getSourcesContainingGroupId,
   }
 }

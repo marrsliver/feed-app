@@ -286,6 +286,44 @@ function SourceRow({ source, active, onClick }: {
   )
 }
 
+// ── AppearsInSourcesBadge ─────────────────────────────────────────────────────
+
+function AppearsInSourcesBadge({ sources }: { sources: LibrarySource[] }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  return (
+    <div ref={ref} className="absolute top-1.5 left-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        className="flex items-center gap-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 hover:bg-black/80 transition-colors"
+        title={`Appears in ${sources.length} other source${sources.length !== 1 ? 's' : ''}`}
+      >
+        <GitBranch size={8} />
+        {sources.length}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-black/15 shadow-md text-xs py-1 min-w-[160px]">
+          <p className="px-3 py-1 text-[9px] uppercase tracking-widest text-black/30 font-semibold border-b border-black/8">Also in</p>
+          {sources.map(s => (
+            <div key={s.id} className="flex items-center gap-1.5 px-3 py-1.5 text-black/60">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="truncate">{s.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── SourceSpaceWorkspace ──────────────────────────────────────────────────────
 
 function SourceSpaceWorkspace({
@@ -302,6 +340,7 @@ function SourceSpaceWorkspace({
   onOpenPostPanel,
   onConnectItemToSource,
   onDuplicateAsSpace,
+  sourceAppearsIn,
 }: {
   source: LibrarySource
   items: SpaceItem[]
@@ -316,6 +355,7 @@ function SourceSpaceWorkspace({
   onOpenPostPanel: (post: Post | null, item?: SpaceItem) => void
   onConnectItemToSource: (item: SpaceItem) => void
   onDuplicateAsSpace: () => void
+  sourceAppearsIn?: Record<string, LibrarySource[]>
 }) {
   const { addSourceCard, removeSourceCard } = useLibrarySources()
   const { addComment, editComment } = useComments()
@@ -621,11 +661,19 @@ function SourceSpaceWorkspace({
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <SortableContext items={standaloneItems.map(i => i.id)} strategy={rectSortingStrategy}>
             <div className="grid gap-x-4 gap-y-0" style={{ gridAutoRows: '4px', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-              {standaloneItems.map((item) => (
-                <SortableItem key={item.id} id={item.id} item={item}>
-                  {renderItemContent(item)}
-                </SortableItem>
-              ))}
+              {standaloneItems.map((item) => {
+                const appearsIn = sourceAppearsIn?.[item.id]
+                return (
+                  <SortableItem key={item.id} id={item.id} item={item}>
+                    <div className="relative">
+                      {renderItemContent(item)}
+                      {appearsIn && appearsIn.length > 0 && (
+                        <AppearsInSourcesBadge sources={appearsIn} />
+                      )}
+                    </div>
+                  </SortableItem>
+                )
+              })}
             </div>
           </SortableContext>
           <DragOverlay dropAnimation={null}>
@@ -675,8 +723,8 @@ function SourceSpacesPageInner() {
   const { sources, setCategory, setIndustry, addTag, removeTag, renameSource, allTags, addSourceCard, removeSourceCard, addAssociation, removeAssociation, setSummary } = useLibrarySources()
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
-  const { getItems, appendItem, removeItem, updateItem, reorderItems } = useSourceItems()
-  const { spaces, createSpace, appendItem: appendRemixItem } = useSpaces()
+  const { getItems, appendItem, removeItem, updateItem, reorderItems, updateItemByGroupId: updateSourceItemByGroupId, moveItemToSource: moveSourceItemToSource, getSourcesContainingGroupId } = useSourceItems()
+  const { spaces, createSpace, appendItem: appendRemixItem, updateItemByGroupId: updateSpaceItemByGroupId } = useSpaces()
   const { addComment, deleteComment, editComment: editSourceComment, getComments } = useComments()
 
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
@@ -870,12 +918,25 @@ function SourceSpacesPageInner() {
     if (!item || !selectedSourceId) return
     setConnectingItem(null)
     if (item.sourceRef && item.sourceRef !== sourceId) removeSourceCard(item.sourceRef, item.cardRef ?? item.id)
-    const updates: Partial<SpaceItem> = { sourceRef: sourceId, cardRef: item.id }
+    const newSource = sources.find(s => s.id === sourceId)
+    const updates: Partial<SpaceItem> = {
+      sourceRef: sourceId,
+      cardRef: item.id,
+      ...(item.postData && newSource ? {
+        postData: { ...item.postData, sourceId, sourceName: newSource.name, sourceColor: newSource.color }
+      } : {}),
+    }
     if (item.type === 'note' && item.content) {
       const newCommentId = addComment(sourceId, item.content)
       updates.commentId = newCommentId
     }
-    updateItem(selectedSourceId, item.id, updates)
+    const gid = item.copyGroupId ?? item.id
+    updateSpaceItemByGroupId(gid, updates)       // all Remix spaces
+    updateSourceItemByGroupId(gid, updates)      // all source-spaces
+    // Move in source-spaces if reassigning
+    if (item.sourceRef && item.sourceRef !== sourceId) {
+      moveSourceItemToSource(item.sourceRef, sourceId, item.id)
+    }
     if (item.type !== 'note') {
       const title = item.postData?.title ?? item.type
       const url = item.postData?.url ?? item.postRef?.url ?? ''
@@ -897,6 +958,18 @@ function SourceSpacesPageInner() {
   }, [spaces])
 
   const totalCount = sources.length
+
+  // "Appears in N sources" — which other source-spaces contain items with the same copyGroupId
+  const sourceAppearsIn = useMemo(() => {
+    const map: Record<string, LibrarySource[]> = {}
+    for (const item of selectedSourceItems) {
+      const gid = item.copyGroupId ?? item.id
+      const sids = getSourcesContainingGroupId(gid).filter(s => s !== selectedSourceId)
+      if (sids.length > 0)
+        map[item.id] = sids.map(sid => sources.find(s => s.id === sid)).filter(Boolean) as LibrarySource[]
+    }
+    return map
+  }, [selectedSourceItems, getSourcesContainingGroupId, selectedSourceId, sources])
 
   return (
     <main className="h-screen flex flex-col overflow-hidden">
@@ -1022,6 +1095,7 @@ function SourceSpacesPageInner() {
                 onOpenPostPanel={openPostPanelFor}
                 onConnectItemToSource={setConnectingItem}
                 onDuplicateAsSpace={handleDuplicateAsSpace}
+                sourceAppearsIn={sourceAppearsIn}
               />
             )}
           </div>
@@ -1074,6 +1148,35 @@ function SourceSpacesPageInner() {
               onAddAssociation={(targetId) => addAssociation(openSourcePanel.id, targetId)}
               onRemoveAssociation={(targetId) => removeAssociation(openSourcePanel.id, targetId)}
               onOpenAssociation={(src) => openSourcePanelFor(src.id)}
+              onAddPieceToSpace={(spaceId, card) => {
+                const src = openSourcePanel
+                appendRemixItem(spaceId, {
+                  type: 'post' as const, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                  postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: src.id, sourceName: src.name, sourceColor: src.color } as Post,
+                  copyGroupId: card.id, cardRef: card.id, sourceRef: src.id, addedAt: card.addedAt,
+                })
+              }}
+              onChangePieceSource={(card) => {
+                const src = openSourcePanel
+                const asItem: SpaceItem = {
+                  id: card.id, type: 'post' as const,
+                  postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: src.id, sourceName: src.name, sourceColor: src.color } as Post,
+                  cardRef: card.id, copyGroupId: card.id, sourceRef: src.id, addedAt: card.addedAt,
+                }
+                setConnectingItem(asItem)
+              }}
+              onShowPieceOnAssociations={(card, targetSourceIds) => {
+                const src = openSourcePanel
+                const base: SpaceItem = {
+                  id: card.id, type: 'post' as const,
+                  postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: src.id, sourceName: src.name, sourceColor: src.color } as Post,
+                  copyGroupId: card.id, cardRef: card.id, sourceRef: src.id, addedAt: card.addedAt,
+                }
+                for (const sid of targetSourceIds) {
+                  appendItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` })
+                  addSourceCard(sid, card)
+                }
+              }}
             />
           )}
         </div>

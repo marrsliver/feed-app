@@ -1616,6 +1616,7 @@ function RemixPageInner() {
     spaces, loaded, createSpace, deleteSpace, restoreSpace, permanentDeleteSpace, trashedSpaces,
     renameSpace, updateDescription, addPost, addNote, addSource, addMedia,
     nestSpace, removeItem, reorderItems, updateItem, appendItem, updateSpaceTags,
+    updateItemByGroupId: updateSpaceItemByGroupId,
   } = useSpaces()
 
   const { folders, trashedFolders, createFolder, renameFolder, deleteFolder, restoreFolder, permanentDeleteFolder, addSpaceToFolder, removeSpaceFromFolder, getFolderForSpace, reorderFolders, sidebarOrder, updateSidebarOrder } = useSpaceFolders()
@@ -1633,7 +1634,7 @@ function RemixPageInner() {
   const [newFolderId, setNewFolderId] = useState<string | null>(null)
   useEffect(() => { if (newFolderId) { const t = setTimeout(() => setNewFolderId(null), 500); return () => clearTimeout(t) } }, [newFolderId])
   const { sources, setCategory, setIndustry, addTag, removeTag, renameSource, allTags, addSourceCard, removeSourceCard, addAssociation, removeAssociation, addSource: addLibrarySource } = useLibrarySources()
-  const { appendItem: appendSourceItem } = useSourceItems()
+  const { appendItem: appendSourceItem, updateItemByGroupId: updateSourceItemByGroupId, moveItemToSource: moveSourceItemToSource } = useSourceItems()
 
   function convertSpaceToSource(spaceId: string) {
     const space = spaces.find(s => s.id === spaceId)
@@ -1744,19 +1745,32 @@ function RemixPageInner() {
     if (item.sourceRef && item.sourceRef !== sourceId) {
       removeSourceCard(item.sourceRef, item.cardRef ?? item.id)
     }
-    const updates: Partial<SpaceItem> = { sourceRef: sourceId, cardRef: item.id }
+    const newSource = sources.find(s => s.id === sourceId)
+    const updates: Partial<SpaceItem> = {
+      sourceRef: sourceId,
+      cardRef: item.id,
+      ...(item.postData && newSource ? {
+        postData: { ...item.postData, sourceId, sourceName: newSource.name, sourceColor: newSource.color }
+      } : {}),
+    }
     if (item.type === 'note' && item.content) {
       const newCommentId = addComment(sourceId, item.content)
       updates.commentId = newCommentId
     }
-    updateItem(space.id, item.id, updates)
+    const gid = item.copyGroupId ?? item.id
+    updateSpaceItemByGroupId(gid, updates)       // all Remix spaces
+    updateSourceItemByGroupId(gid, updates)      // all source-spaces
+    // Move in source-spaces if reassigning
+    if (item.sourceRef && item.sourceRef !== sourceId) {
+      moveSourceItemToSource(item.sourceRef, sourceId, item.id)
+    }
     // Notes go to Analysis Notes via addComment only — never create a Piece
     if (item.type !== 'note') {
       const title = item.postData?.title ?? item.type
       const url = item.postData?.url ?? item.postRef?.url ?? ''
       addSourceCard(sourceId, { id: item.id, url, title, addedAt: item.addedAt })
     }
-  }, [addComment, addSourceCard, removeSourceCard, updateItem])
+  }, [addComment, addSourceCard, removeSourceCard, sources, updateSpaceItemByGroupId, updateSourceItemByGroupId, moveSourceItemToSource])
 
   const searchParams = useSearchParams()
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null)
@@ -2182,6 +2196,35 @@ function RemixPageInner() {
               onAddAssociation={(targetId) => addAssociation(openSourcePanel.id, targetId)}
               onRemoveAssociation={(targetId) => removeAssociation(openSourcePanel.id, targetId)}
               onOpenAssociation={(src) => openSourcePanelExclusive(src)}
+              onAddPieceToSpace={(spaceId, card) => {
+                const src = openSourcePanel
+                addPost(spaceId, {
+                  id: card.id, title: card.title, url: card.url,
+                  date: new Date(card.addedAt).toISOString(),
+                  sourceId: src.id, sourceName: src.name, sourceColor: src.color,
+                } as Post, { sourceRef: src.id, cardRef: card.id })
+              }}
+              onChangePieceSource={(card) => {
+                const asItem: SpaceItem = spaces.flatMap(s => s.items).find(i => i.cardRef === card.id)
+                  ?? { id: card.id, type: 'post' as const, postData: {
+                      id: card.id, title: card.title, url: card.url,
+                      date: new Date(card.addedAt).toISOString(),
+                      sourceId: openSourcePanel.id, sourceName: openSourcePanel.name, sourceColor: openSourcePanel.color,
+                    } as Post, cardRef: card.id, copyGroupId: card.id, sourceRef: openSourcePanel.id, addedAt: card.addedAt }
+                setConnectingItem(asItem)
+              }}
+              onShowPieceOnAssociations={(card, targetSourceIds) => {
+                const src = openSourcePanel
+                const base: SpaceItem = {
+                  id: card.id, type: 'post' as const,
+                  postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: src.id, sourceName: src.name, sourceColor: src.color } as Post,
+                  copyGroupId: card.id, cardRef: card.id, sourceRef: src.id, addedAt: card.addedAt,
+                }
+                for (const sid of targetSourceIds) {
+                  appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` })
+                  addSourceCard(sid, card)
+                }
+              }}
             />
           )}
         </div>

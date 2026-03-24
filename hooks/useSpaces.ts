@@ -308,6 +308,17 @@ export function useSpaces() {
     patchSpace(id, (s) => ({ ...s, tags }))
   }, [patchSpace])
 
+  // Update matching items across ALL spaces by copyGroupId
+  const updateItemByGroupId = useCallback((copyGroupId: string, updates: Partial<SpaceItem>) => {
+    for (const space of spacesRef.current) {
+      if (space.items.some(i => (i.copyGroupId ?? i.id) === copyGroupId)) {
+        mutateItems(space.id, (items) =>
+          items.map(i => (i.copyGroupId ?? i.id) === copyGroupId ? { ...i, ...updates } : i)
+        )
+      }
+    }
+  }, [mutateItems])
+
   return {
     spaces,
     lists: spaces,
@@ -333,6 +344,7 @@ export function useSpaces() {
     isInList,
     isInAnyList,
     updateSpaceTags,
+    updateItemByGroupId,
     // legacy aliases
     createList: createSpace,
     deleteList: deleteSpace,

@@ -12,7 +12,7 @@ interface Props {
   userSources: LibrarySource[]
   categories: SourceCategory[]
   industries?: SourceIndustry[]
-  onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>) => void
+  onAddSource: (source: Omit<LibrarySource, 'color' | 'addedAt' | 'isStatic' | 'tags'>, force?: boolean) => void
   onRemoveSource: (id: string) => void
   onRenameSource?: (id: string, name: string) => void
   onToggleFeed: (id: string) => void
@@ -23,6 +23,7 @@ interface Props {
   hideBackdrop?: boolean
   onCreateCategory?: (name: string) => string
   onCreateIndustry?: (name: string) => string
+  onAddAssociation?: (sourceId: string, targetId: string) => void
 }
 
 type DetectState =
@@ -166,7 +167,7 @@ function SourceRow({
   )
 }
 
-export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated, hideBackdrop, onCreateCategory, onCreateIndustry }: Props) {
+export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSources, categories, industries = [], onAddSource, onRemoveSource, onRenameSource, onToggleFeed, onOpenSource, onClose, onShowCards, elevated, hideBackdrop, onCreateCategory, onCreateIndustry, onAddAssociation }: Props) {
   const router = useRouter()
   const libraryStaticSources = allStaticSources ?? staticSources
   const [inputUrl, setInputUrl] = useState('')
@@ -182,6 +183,8 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
   const [tab, setTab] = useState<TabView>('library')
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
+  const [pendingAssociations, setPendingAssociations] = useState<string[]>([])
+  const [assocSearch, setAssocSearch] = useState('')
   function toggleIndustry(id: string) {
     setExpandedIndustries(prev => {
       const next = new Set(prev)
@@ -267,8 +270,9 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       if (dup) { setDuplicateOf(dup); return }
     }
     setDuplicateOf(null)
+    const newId = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`
     onAddSource({
-      id: `user-${Date.now()}`,
+      id: newId,
       name: confirmName.trim() || detect.title,
       url: detect.siteUrl,
       feedUrl: detect.feedUrl,
@@ -277,7 +281,10 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       feedGroup: feedId,
       categoryId: selectedCategoryId || undefined,
       industryId: selectedIndustryId || undefined,
-    })
+    }, force)
+    for (const targetId of pendingAssociations) onAddAssociation?.(newId, targetId)
+    setPendingAssociations([])
+    setAssocSearch('')
     setInputUrl('')
     setDetect({ status: 'idle' })
     setSelectedCategoryId('')
@@ -291,8 +298,9 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       if (dup) { setDuplicateOf(dup); return }
     }
     setDuplicateOf(null)
+    const newId = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`
     onAddSource({
-      id: `user-${Date.now()}`,
+      id: newId,
       name: confirmName.trim() || detect.title,
       url: detect.siteUrl,
       feedUrl: '',
@@ -301,7 +309,10 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
       feedGroup: feedId,
       categoryId: selectedCategoryId || undefined,
       industryId: selectedIndustryId || undefined,
-    })
+    }, force)
+    for (const targetId of pendingAssociations) onAddAssociation?.(newId, targetId)
+    setPendingAssociations([])
+    setAssocSearch('')
     setInputUrl('')
     setDetect({ status: 'idle' })
     setSelectedCategoryId('')
@@ -515,6 +526,49 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                   </div>
                 )}
               </div>
+              {/* Associate with... */}
+              {onAddAssociation && (
+                <div className="space-y-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Associate with</p>
+                  <input
+                    value={assocSearch}
+                    onChange={(e) => setAssocSearch(e.target.value)}
+                    placeholder="Search sources…"
+                    className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                  />
+                  {assocSearch.trim() && (
+                    <div className="border border-black/10 bg-white max-h-24 overflow-y-auto">
+                      {[...libraryStaticSources, ...userSources]
+                        .filter(s => s.name.toLowerCase().includes(assocSearch.toLowerCase()) && !pendingAssociations.includes(s.id))
+                        .map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => { setPendingAssociations(p => [...p, s.id]); setAssocSearch('') }}
+                            className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-black/5 text-black/70 flex items-center gap-1.5"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                            {s.name}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                  {pendingAssociations.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {pendingAssociations.map(id => {
+                        const s = [...libraryStaticSources, ...userSources].find(x => x.id === id)
+                        if (!s) return null
+                        return (
+                          <span key={id} className="inline-flex items-center gap-0.5 text-[9px] text-black/60 border border-black/15 px-1.5 py-0.5">
+                            {s.name}
+                            <button onClick={() => setPendingAssociations(p => p.filter(x => x !== id))} className="text-black/30 hover:text-black leading-none ml-0.5">×</button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {duplicateOf && (
                 <div className="bg-amber-50 border border-amber-200 px-3 py-2 space-y-2">
                   <p className="text-[11px] text-amber-800 font-medium">⚠ Already in your library</p>
@@ -605,6 +659,49 @@ export function SourcesSidebar({ feedId, staticSources, allStaticSources, userSo
                   </div>
                 )}
               </div>
+
+              {/* Associate with... */}
+              {onAddAssociation && (
+                <div className="space-y-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-widest text-black/40">Associate with</p>
+                  <input
+                    value={assocSearch}
+                    onChange={(e) => setAssocSearch(e.target.value)}
+                    placeholder="Search sources…"
+                    className="w-full text-xs border border-black/15 px-2 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                  />
+                  {assocSearch.trim() && (
+                    <div className="border border-black/10 bg-white max-h-24 overflow-y-auto">
+                      {[...libraryStaticSources, ...userSources]
+                        .filter(s => s.name.toLowerCase().includes(assocSearch.toLowerCase()) && !pendingAssociations.includes(s.id))
+                        .map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => { setPendingAssociations(p => [...p, s.id]); setAssocSearch('') }}
+                            className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-black/5 text-black/70 flex items-center gap-1.5"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                            {s.name}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                  {pendingAssociations.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {pendingAssociations.map(id => {
+                        const s = [...libraryStaticSources, ...userSources].find(x => x.id === id)
+                        if (!s) return null
+                        return (
+                          <span key={id} className="inline-flex items-center gap-0.5 text-[9px] text-black/60 border border-black/15 px-1.5 py-0.5">
+                            {s.name}
+                            <button onClick={() => setPendingAssociations(p => p.filter(x => x !== id))} className="text-black/30 hover:text-black leading-none ml-0.5">×</button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {duplicateOf && (
                 <div className="bg-amber-50 border border-amber-200 px-3 py-2 space-y-2">

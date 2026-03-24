@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import { Loader2, BookmarkCheck, BookmarkIcon, Sparkles, Archive, Rss, Shuffle } from 'lucide-react'
-import type { LibrarySource, PostsApiResponse, Post } from '@/lib/types'
+import type { LibrarySource, PostsApiResponse, Post, SpaceItem } from '@/lib/types'
 import { rankPosts, rankPostsDiversified } from '@/lib/rankPosts'
 import { PostCard } from './PostCard'
 import { SourceFilter } from './SourceFilter'
@@ -22,6 +22,7 @@ import { SelectSourcesModal } from './SelectSourcesModal'
 import { TagSourcesPanel } from './TagSourcesPanel'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useLibrarySources } from '@/hooks/useLibrarySources'
+import { useSourceItems } from '@/hooks/useSourceItems'
 import { useSourceLists } from '@/hooks/useSourceLists'
 import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useSourceIndustries } from '@/hooks/useSourceIndustries'
@@ -227,6 +228,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
   const { spaces, lists, createSpace, createList, deleteList, renameList, addNote, addPost: addPostToSpace } = useSpaces()
+  const { appendItem: appendSourceItem } = useSourceItems()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
   const { deletedPosts, hiddenIds, archivePost, restorePost } = useDeletedPosts()
@@ -577,6 +579,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onClose={() => setSourcesOpen(false)}
           onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
           elevated={sourcesCardsOpen}
+          onAddAssociation={addAssociation}
         />
       )}
 
@@ -821,6 +824,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
         onSetSummary={setSummary}
         onAddPieceToSpace={(spaceId, card) => { const source = sidebarSelectedSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
+        onShowPieceOnAssociations={(card, targetSourceIds) => { const source = sidebarSelectedSource; if (!source) return; const base: SpaceItem = { id: card.id, type: 'post' as const, postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post, copyGroupId: card.id, cardRef: card.id, sourceRef: source.id, addedAt: card.addedAt }; for (const sid of targetSourceIds) { appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }); addSourceCard(sid, card) } }}
       />
     )}
     {sourcesCardsPanelSource && !sourcesCardsOpen && (
@@ -860,6 +864,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
         onSetSummary={setSummary}
         onAddPieceToSpace={(spaceId, card) => { const source = sourcesCardsPanelSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
+        onShowPieceOnAssociations={(card, targetSourceIds) => { const source = sourcesCardsPanelSource; if (!source) return; const base: SpaceItem = { id: card.id, type: 'post' as const, postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post, copyGroupId: card.id, cardRef: card.id, sourceRef: source.id, addedAt: card.addedAt }; for (const sid of targetSourceIds) { appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }); addSourceCard(sid, card) } }}
       />
     )}
     </div>
