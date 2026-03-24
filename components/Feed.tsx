@@ -249,25 +249,19 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     [feedStaticSources, feedUserSources]
   )
 
-  // All library source IDs for the filter bar (every source the user has added)
-  const allFilterSourceIds = useMemo(
-    () => allSources.map((s) => s.id),
-    [allSources]
-  )
-
-  // Populate activeSources when library loads — includes ALL library sources
+  // Populate activeSources when library loads
   useEffect(() => {
     if (!sourcesLoaded) return
     setActiveSources((prev) => {
       if (prev.size > 0) {
-        // Add any newly-added sources so new additions appear active immediately
+        // Add any newly-added feed sources so they appear active immediately
         const next = new Set(prev)
-        allFilterSourceIds.forEach((id) => next.add(id))
+        allSourceIds.forEach((id) => next.add(id))
         return next
       }
-      return new Set(allFilterSourceIds)
+      return new Set(allSourceIds)
     })
-  }, [sourcesLoaded, allFilterSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sourcesLoaded, allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset to 'all' if active list is deleted
   useEffect(() => {
@@ -290,20 +284,20 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
 
   const toggleSource = useCallback((id: string) => {
     setActiveSources((prev) => {
-      // If all are active, first click spotlights just this source
-      if (prev.size === allFilterSourceIds.length) return new Set([id])
+      // If all feed sources are active, first click spotlights just this source
+      if (prev.size === allSourceIds.length) return new Set([id])
       // Otherwise multi-select: toggle this source in/out
       const next = new Set(prev)
       if (next.has(id)) {
         next.delete(id)
         // Deselecting the last one resets to all
-        if (next.size === 0) return new Set(allFilterSourceIds)
+        if (next.size === 0) return new Set(allSourceIds)
       } else {
         next.add(id)
       }
       return next
     })
-  }, [allFilterSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allSourceIds.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Paginated user-source fetching
   const [userSourcePage, setUserSourcePage] = useState(1)
@@ -400,13 +394,11 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     ? allSources.find((s) => s.id === sourcesCardsPanelId) ?? null
     : null
 
-  // Sources for the filter bar — ALL library sources, alphabetized
-  const filterSources = useMemo(() =>
-    [...allSources]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
-    [allSources]
-  )
+  // Sources for the filter bar — only sources that contribute content to this feed
+  const filterSources = useMemo(() => [
+    ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
+    ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
+  ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
 
   // Reset includeAssociated when filter is cleared
   useEffect(() => {
@@ -556,7 +548,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
               sources={filterSources}
               active={activeSources}
               onToggle={toggleSource}
-              onReset={() => setActiveSources(new Set(allFilterSourceIds))}
+              onReset={() => setActiveSources(new Set(allSourceIds))}
               onToggleIncludeAssociated={() => setIncludeAssociated(v => !v)}
               includeAssociated={includeAssociated}
               associatedCount={associatedSourceIds.size}
