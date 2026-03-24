@@ -2,6 +2,12 @@
 
 import type { Source } from '@/lib/types'
 
+interface AssocSource {
+  id: string
+  name: string
+  color: string
+}
+
 interface Props {
   sources: Source[]
   active: Set<string>
@@ -9,16 +15,17 @@ interface Props {
   onReset: () => void
   onToggleIncludeAssociated?: () => void
   includeAssociated?: boolean
-  associatedCount?: number
+  associatedSources?: AssocSource[]
 }
 
-export function SourceFilter({ sources, active, onToggle, onReset, onToggleIncludeAssociated, includeAssociated, associatedCount }: Props) {
+export function SourceFilter({ sources, active, onToggle, onReset, onToggleIncludeAssociated, includeAssociated, associatedSources }: Props) {
   if (sources.length === 0) return null
 
   const allActive = sources.every((s) => active.has(s.id))
+  const hasAssociated = !!onToggleIncludeAssociated && !!associatedSources && associatedSources.length > 0
 
   return (
-    <div className="relative">
+    <div className="relative flex flex-col gap-1">
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
         <button
           onClick={onReset}
@@ -47,7 +54,14 @@ export function SourceFilter({ sources, active, onToggle, onReset, onToggleInclu
             </button>
           )
         })}
-        {onToggleIncludeAssociated && associatedCount !== undefined && associatedCount > 0 && (
+      </div>
+
+      {/* Right fade — hints at overflow */}
+      <div className="pointer-events-none absolute right-0 top-0 h-6 w-8 bg-gradient-to-l from-white to-transparent" />
+
+      {/* Related sources row — appears below when a source is spotlighted */}
+      {hasAssociated && (
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={onToggleIncludeAssociated}
             className={`shrink-0 text-[10px] flex items-center gap-1 px-2 py-0.5 border transition-colors ${
@@ -57,12 +71,19 @@ export function SourceFilter({ sources, active, onToggle, onReset, onToggleInclu
             }`}
           >
             <span>{includeAssociated ? '✓' : '+'}</span>
-            <span>{associatedCount} related source{associatedCount !== 1 ? 's' : ''}</span>
+            <span>{associatedSources!.length} related source{associatedSources!.length !== 1 ? 's' : ''}</span>
           </button>
-        )}
-      </div>
-      {/* Right fade — hints at overflow */}
-      <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white to-transparent" />
+          {includeAssociated && associatedSources!.map((s) => (
+            <span
+              key={s.id}
+              className="shrink-0 text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 text-white"
+              style={{ backgroundColor: s.color }}
+            >
+              {s.name}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

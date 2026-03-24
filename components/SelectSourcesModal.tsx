@@ -21,8 +21,10 @@ interface Props {
   activeSources: Set<string>
   categories?: GroupItem[]
   industries?: GroupItem[]
-  onConfirm: (selected: Set<string>) => void
+  onConfirm: (selected: Set<string>, includeAssociated: boolean) => void
   onClose: () => void
+  initialIncludeAssociated?: boolean
+  hasAssociations?: boolean
 }
 
 type CheckState = 'all' | 'some' | 'none'
@@ -57,7 +59,7 @@ function GroupCheckbox({ state, onClick }: { state: CheckState; onClick: () => v
   )
 }
 
-export function SelectSourcesModal({ sources, activeSources, categories = [], industries = [], onConfirm, onClose }: Props) {
+export function SelectSourcesModal({ sources, activeSources, categories = [], industries = [], onConfirm, onClose, initialIncludeAssociated = false, hasAssociations = false }: Props) {
   const allSourceIds = useMemo(() => sources.map(s => s.id), [sources])
 
   // Start empty when all are active — groups then ADD (never confusingly deselect)
@@ -66,6 +68,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
     const allActive = sources.every(s => activeSources.has(s.id))
     return allActive ? new Set<string>() : new Set(activeSources)
   })
+  const [includeAssociated, setIncludeAssociated] = useState(initialIncludeAssociated)
 
   const [search, setSearch] = useState('')
   const [expandedIndustries, setExpandedIndustries] = useState<Set<string>>(new Set())
@@ -181,7 +184,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
   const allState = groupCheckState(allSourceIds, effectiveSelected)
 
   function handleConfirm() {
-    onConfirm(isNoFilter ? new Set(allSourceIds) : selected)
+    onConfirm(isNoFilter ? new Set(allSourceIds) : selected, includeAssociated)
     onClose()
   }
 
@@ -344,22 +347,35 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 border-t border-black/10 shrink-0 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button onClick={onClose} className="text-xs text-black/40 hover:text-black transition-colors">Cancel</button>
+          <div className="px-4 py-3 border-t border-black/10 shrink-0 flex flex-col gap-2">
+            {hasAssociations && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeAssociated}
+                  onChange={() => setIncludeAssociated(v => !v)}
+                  className="shrink-0"
+                />
+                <span className="text-xs text-black/60">Include posts from associated sources</span>
+              </label>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <button onClick={onClose} className="text-xs text-black/40 hover:text-black transition-colors">Cancel</button>
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="text-xs text-black/40 hover:text-black transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
               <button
-                onClick={() => setSelected(new Set())}
-                className="text-xs text-black/40 hover:text-black transition-colors"
+                onClick={handleConfirm}
+                className="px-4 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
               >
-                Reset
+                Apply {isNoFilter ? '(all)' : `(${selected.size})`}
               </button>
             </div>
-            <button
-              onClick={handleConfirm}
-              className="px-4 py-1.5 text-xs font-medium bg-black text-white hover:bg-black/80 transition-colors"
-            >
-              Apply {isNoFilter ? '(all)' : `(${selected.size})`}
-            </button>
           </div>
         </div>
       </div>

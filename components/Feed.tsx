@@ -353,27 +353,30 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     [data]
   )
 
-  // Compute associated source IDs for the active filter sources
-  const associatedSourceIds = useMemo(() => {
-    if (activeSources.size === 0) return new Set<string>()
-    const extra = new Set<string>()
+  // Compute associated source objects for the active filter sources (excluded ones only)
+  const associatedSources = useMemo(() => {
+    if (activeSources.size === 0 || activeSources.size === allSourceIds.length) return []
+    const extraIds = new Set<string>()
     for (const source of allSources) {
       if (!activeSources.has(source.id)) continue
       for (const assocId of source.associations ?? []) {
-        if (!activeSources.has(assocId)) extra.add(assocId)
+        if (!activeSources.has(assocId)) extraIds.add(assocId)
       }
     }
-    return extra
-  }, [activeSources, allSources])
+    return [...extraIds]
+      .map(id => allSources.find(s => s.id === id))
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .map(s => ({ id: s.id, name: s.name, color: s.color }))
+  }, [activeSources, allSources, allSourceIds.length])
 
   const allPosts = useMemo(() => {
     const seenIds = new Set<string>()
     const filtered = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
       .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
       .filter((p) => !hiddenIds.includes(p.id))
-      .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId) || (includeAssociated && associatedSourceIds.has(p.sourceId)))
+      .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId) || (includeAssociated && associatedSources.some(s => s.id === p.sourceId)))
     return shuffleSeed !== null ? rankPostsDiversified(filtered, shuffleSeed) : rankPosts(filtered)
-  }, [manualPosts, fetchedPosts, accumulatedUserPosts, hiddenIds, activeSources, includeAssociated, associatedSourceIds, shuffleSeed])
+  }, [manualPosts, fetchedPosts, accumulatedUserPosts, hiddenIds, activeSources, includeAssociated, associatedSources, shuffleSeed])
   const activeList = lists.find((l) => l.id === view)
   const listFiltered =
     view === 'all'
@@ -400,10 +403,10 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
   ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
 
-  // Reset includeAssociated when filter is cleared
+  // Reset includeAssociated when all sources are active (no spotlight)
   useEffect(() => {
-    if (activeSources.size === 0) setIncludeAssociated(false)
-  }, [activeSources.size])
+    if (activeSources.size === allSourceIds.length) setIncludeAssociated(false)
+  }, [activeSources.size, allSourceIds.length])
 
   return (
     <>
@@ -551,7 +554,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
               onReset={() => setActiveSources(new Set(allSourceIds))}
               onToggleIncludeAssociated={() => setIncludeAssociated(v => !v)}
               includeAssociated={includeAssociated}
-              associatedCount={associatedSourceIds.size}
+              associatedSources={associatedSources}
             />
           </div>
         </div>
@@ -654,7 +657,9 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           activeSources={activeSources}
           categories={categories}
           industries={industries}
-          onConfirm={(selected) => setActiveSources(selected)}
+          initialIncludeAssociated={includeAssociated}
+          hasAssociations={allSources.some(s => (s.associations ?? []).length > 0)}
+          onConfirm={(selected, incAssoc) => { setActiveSources(selected); setIncludeAssociated(incAssoc) }}
           onClose={() => setSelectSourcesOpen(false)}
         />
       )}
