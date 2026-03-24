@@ -403,6 +403,13 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
   ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
 
+  // All library sources for the filter modal (includes library-only sources for association filtering)
+  const allSourcesForModal = useMemo(() =>
+    [...allSources]
+      .map((s) => ({ id: s.id, name: s.name, url: s.url ?? '', type: s.type, color: s.color, feedUrl: s.feedUrl ?? '', categoryId: s.categoryId, industryId: s.industryId }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  , [allSources])
+
   // Reset includeAssociated when all sources are active (no spotlight)
   useEffect(() => {
     if (activeSources.size === allSourceIds.length) setIncludeAssociated(false)
@@ -653,8 +660,9 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
       {/* Select Sources modal */}
       {selectSourcesOpen && (
         <SelectSourcesModal
-          sources={filterSources}
+          sources={allSourcesForModal}
           activeSources={activeSources}
+          feedSourceIds={new Set(allSourceIds)}
           categories={categories}
           industries={industries}
           initialIncludeAssociated={includeAssociated}

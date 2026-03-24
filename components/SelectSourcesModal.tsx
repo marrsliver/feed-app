@@ -19,6 +19,7 @@ interface GroupItem {
 interface Props {
   sources: SourceItem[]
   activeSources: Set<string>
+  feedSourceIds?: Set<string>
   categories?: GroupItem[]
   industries?: GroupItem[]
   onConfirm: (selected: Set<string>, includeAssociated: boolean) => void
@@ -59,7 +60,7 @@ function GroupCheckbox({ state, onClick }: { state: CheckState; onClick: () => v
   )
 }
 
-export function SelectSourcesModal({ sources, activeSources, categories = [], industries = [], onConfirm, onClose, initialIncludeAssociated = false, hasAssociations = false }: Props) {
+export function SelectSourcesModal({ sources, activeSources, feedSourceIds, categories = [], industries = [], onConfirm, onClose, initialIncludeAssociated = false, hasAssociations = false }: Props) {
   const allSourceIds = useMemo(() => sources.map(s => s.id), [sources])
 
   // Start empty when all are active — groups then ADD (never confusingly deselect)
@@ -204,7 +205,10 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-black/10 shrink-0">
-            <h2 className="text-sm font-semibold text-black">Filter Sources</h2>
+            <div>
+              <h2 className="text-sm font-semibold text-black">Filter Sources</h2>
+              {feedSourceIds && <p className="text-[10px] text-black/35 mt-0.5">Sources marked <span className="uppercase tracking-widest">feed</span> contribute posts directly</p>}
+            </div>
             <button onClick={onClose} className="p-1 hover:bg-black/5 transition-colors text-black/30 hover:text-black">
               <X size={16} />
             </button>
@@ -237,6 +241,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
                     <input type="checkbox" checked={effectiveSelected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                     <span className="text-sm text-black/70 flex-1">{s.name}</span>
+                    {feedSourceIds?.has(s.id) && <span className="text-[9px] uppercase tracking-widest text-black/25 shrink-0">feed</span>}
                   </label>
                 ))}
                 {filteredSources.length === 0 && (
@@ -323,6 +328,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
                                     <input type="checkbox" checked={effectiveSelected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
                                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                                     <span className="text-xs text-black/60 flex-1">{s.name}</span>
+                                    {feedSourceIds?.has(s.id) && <span className="text-[9px] uppercase tracking-widest text-black/25 shrink-0">feed</span>}
                                   </label>
                                 ))}
                               </div>
@@ -335,6 +341,7 @@ export function SelectSourcesModal({ sources, activeSources, categories = [], in
                               <input type="checkbox" checked={effectiveSelected.has(s.id)} onChange={() => toggleSource(s.id)} className="shrink-0" />
                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                               <span className="text-xs text-black/60 flex-1">{s.name}</span>
+                              {feedSourceIds?.has(s.id) && <span className="text-[9px] uppercase tracking-widest text-black/25 shrink-0">feed</span>}
                             </label>
                           ))}
                         </div>
