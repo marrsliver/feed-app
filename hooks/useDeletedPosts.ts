@@ -1,21 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import type { Post } from '@/lib/types'
-import { queueWrite, clearWrite } from '@/lib/pendingWrites'
-import { notifyPendingWritesChanged } from './usePendingWrites'
-
-function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
-  const writeId = queueWrite(url, method, body)
-  notifyPendingWritesChanged()
-  fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
-    .catch(() => { /* stays in queue until replayed */ })
-}
+import { persist } from '@/lib/persist'
+import { lsSet } from '@/lib/localStorage'
+import { useCachedAPI } from '@/hooks/useCachedAPI'
 
 export interface DeletedRecord {
   post: Post
@@ -26,43 +15,17 @@ export interface DeletedRecord {
 
 const LS_KEY = 'deleted_posts_cache_v1'
 
-function readCache(): DeletedRecord[] | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as DeletedRecord[]
-  } catch { return null }
-}
-
-function writeCache(records: DeletedRecord[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(records)) } catch { /* ignore */ }
-}
-
 export function useDeletedPosts() {
-  const [records, setRecords] = useState<DeletedRecord[]>(() => readCache() ?? [])
-
-  useEffect(() => {
-    fetch('/api/db/deleted-posts')
-      .then((r) => r.json())
-      .then((data: DeletedRecord[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          writeCache(data)
-          setRecords(data)
-        } else {
-          const cached = readCache()
-          if (cached && cached.length > 0) setRecords(cached)
-        }
-      })
-      .catch(() => {
-        const cached = readCache()
-        if (cached) setRecords(cached)
-      })
-  }, [])
+  const [records, setRecords] = useCachedAPI<DeletedRecord[]>(
+    '/api/db/deleted-posts',
+    LS_KEY,
+    [],
+  )
 
   const updateRecords = useCallback((updater: (prev: DeletedRecord[]) => DeletedRecord[]) => {
     setRecords((prev) => {
       const next = updater(prev)
-      writeCache(next)
+      lsSet(LS_KEY, next)
       return next
     })
   }, [])

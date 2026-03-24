@@ -29,6 +29,7 @@ import { useLibrarySources } from '@/hooks/useLibrarySources'
 import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useSourceIndustries } from '@/hooks/useSourceIndustries'
 import { useComments } from '@/hooks/useComments'
+import { usePanelStack } from '@/hooks/usePanelStack'
 import { pushUndo } from '@/lib/undoStack'
 import type { SpaceItem, SpaceItemVersion, LibrarySource, Post, Space } from '@/lib/types'
 
@@ -729,9 +730,6 @@ function SourceSpacesPageInner() {
 
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [sidebarSearch, setSidebarSearch] = useState('')
-  const [openSourcePanelId, setOpenSourcePanelId] = useState<string | null>(null)
-  const [openPostPanel, setOpenPostPanel] = useState<Post | null>(null)
-  const [openPostPanelItem, setOpenPostPanelItem] = useState<SpaceItem | null>(null)
   const [connectingItem, setConnectingItem] = useState<SpaceItem | null>(null)
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const [addLinkSourceId, setAddLinkSourceId] = useState<string | null>(null)
@@ -772,7 +770,17 @@ function SourceSpacesPageInner() {
   }, [sources.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedSource = selectedSourceId ? (sources.find(s => s.id === selectedSourceId) ?? null) : null
-  const openSourcePanel = openSourcePanelId ? (sources.find(s => s.id === openSourcePanelId) ?? null) : null
+  const {
+    openSourcePanelId,
+    openSourcePanel,
+    openPostPanel,
+    openPostPanelItem,
+    panelHistory,
+    openSource: openSourcePanelFor,
+    openPost: openPostPanelFor,
+    back: handlePanelBack,
+    close: handlePanelClose,
+  } = usePanelStack(sources)
 
   // ── Merged items: derived (comments + pieces) + user-added ─────────────────
   // Comments → note items linked via commentId; Pieces → post items linked via cardRef
@@ -869,36 +877,6 @@ function SourceSpacesPageInner() {
     return { industryMap, noIndustry }
   }, [filteredSources])
 
-  // Panel history for back navigation
-  const [panelHistory, setPanelHistory] = useState<Array<{ type: 'source'; id: string } | { type: 'post'; post: Post }>>([])
-
-  function openSourcePanelFor(srcId: string, skipHistory = false) {
-    if (!skipHistory && openPostPanel) setPanelHistory(h => [...h, { type: 'post', post: openPostPanel }])
-    setOpenSourcePanelId(srcId)
-    setOpenPostPanel(null)
-  }
-
-  function openPostPanelFor(post: Post | null, item?: SpaceItem, skipHistory = false) {
-    if (!skipHistory && post && openSourcePanelId) setPanelHistory(h => [...h, { type: 'source', id: openSourcePanelId }])
-    setOpenPostPanel(post)
-    setOpenPostPanelItem(item ?? null)
-    if (post) setOpenSourcePanelId(null)
-  }
-
-  function handlePanelBack() {
-    const last = panelHistory[panelHistory.length - 1]
-    if (!last) { handlePanelClose(); return }
-    setPanelHistory(h => h.slice(0, -1))
-    if (last.type === 'source') { setOpenSourcePanelId(last.id); setOpenPostPanel(null) }
-    else { setOpenPostPanel(last.post); setOpenPostPanelItem(null); setOpenSourcePanelId(null) }
-  }
-
-  function handlePanelClose() {
-    setPanelHistory([])
-    setOpenSourcePanelId(null)
-    setOpenPostPanel(null)
-    setOpenPostPanelItem(null)
-  }
 
   function handleDuplicateAsSpace() {
     if (!selectedSource) return

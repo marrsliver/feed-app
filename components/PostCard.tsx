@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import Image from 'next/image'
 import type { Post } from '@/lib/types'
 import { BookmarkButton } from './BookmarkButton'
@@ -33,7 +33,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost, onSavedToSpace, savedInSpaces, onNavigateToSpace }: Props) {
+function PostCardInner({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost, onSavedToSpace, savedInSpaces, onNavigateToSpace }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
 
   return (
@@ -126,3 +126,19 @@ export function PostCard({ post, feedId, isRead, onRead, onMove, onDelete, onOpe
     </>
   )
 }
+
+export const PostCard = memo(PostCardInner, (prev, next) => {
+  // Return true to skip re-render (props are considered equal)
+  if (prev.post.id !== next.post.id) return false
+  if (prev.isRead !== next.isRead) return false
+  if (prev.feedId !== next.feedId) return false
+  // savedInSpaces: compare length and ids
+  const prevSpaces = prev.savedInSpaces ?? []
+  const nextSpaces = next.savedInSpaces ?? []
+  if (prevSpaces.length !== nextSpaces.length) return false
+  for (let i = 0; i < prevSpaces.length; i++) {
+    if (prevSpaces[i].id !== nextSpaces[i].id) return false
+  }
+  // Callback identity changes don't affect rendered output, skip comparing them
+  return true
+})

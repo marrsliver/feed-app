@@ -1,61 +1,24 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import type { SourceList } from '@/lib/types'
-import { queueWrite, clearWrite } from '@/lib/pendingWrites'
-import { notifyPendingWritesChanged } from './usePendingWrites'
-
-function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
-  const writeId = queueWrite(url, method, body)
-  notifyPendingWritesChanged()
-  fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
-    .catch(() => { /* stays in queue until replayed */ })
-}
+import { persist } from '@/lib/persist'
+import { lsSet } from '@/lib/localStorage'
+import { useCachedAPI } from '@/hooks/useCachedAPI'
 
 const LS_KEY = 'source_lists_cache_v1'
 
-function readCache(): SourceList[] | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as SourceList[]
-  } catch { return null }
-}
-
-function writeCache(lists: SourceList[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(lists)) } catch { /* ignore */ }
-}
-
 export function useSourceLists() {
-  const [lists, setLists] = useState<SourceList[]>(() => readCache() ?? [])
-
-  useEffect(() => {
-    fetch('/api/db/source-lists')
-      .then((r) => r.json())
-      .then((data: SourceList[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          writeCache(data)
-          setLists(data)
-        } else {
-          const cached = readCache()
-          if (cached && cached.length > 0) setLists(cached)
-        }
-      })
-      .catch(() => {
-        const cached = readCache()
-        if (cached) setLists(cached)
-      })
-  }, [])
+  const [lists, setLists] = useCachedAPI<SourceList[]>(
+    '/api/db/source-lists',
+    LS_KEY,
+    [],
+  )
 
   const updateLists = useCallback((updater: (prev: SourceList[]) => SourceList[]) => {
     setLists((prev) => {
       const next = updater(prev)
-      writeCache(next)
+      lsSet(LS_KEY, next)
       return next
     })
   }, [])

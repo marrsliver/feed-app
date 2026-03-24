@@ -2,35 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Comment } from '@/lib/types'
-import { queueWrite, clearWrite } from '@/lib/pendingWrites'
-import { notifyPendingWritesChanged } from './usePendingWrites'
-
-function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
-  const writeId = queueWrite(url, method, body)
-  notifyPendingWritesChanged()
-  fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
-    .catch(() => { /* stays in queue until replayed */ })
-}
+import { persist } from '@/lib/persist'
+import { lsGet, lsSet } from '@/lib/localStorage'
 
 const LS_KEY = 'comments_cache_v1'
 type CommentsMap = Record<string, Comment[]>
-
-function readCache(): CommentsMap | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as CommentsMap
-  } catch { return null }
-}
-
-function writeCache(data: CommentsMap) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(data)) } catch { /* ignore */ }
-}
 
 // ── Module-level singleton — all useComments() instances share this state ──────
 let _data: CommentsMap = {}
@@ -39,7 +15,7 @@ let _fetched = false
 
 function setGlobalData(updater: (prev: CommentsMap) => CommentsMap) {
   _data = updater(_data)
-  writeCache(_data)
+  lsSet(LS_KEY, _data)
   _subscribers.forEach((fn) => fn(_data))
 }
 
@@ -47,7 +23,7 @@ export function useComments() {
   const [data, setData] = useState<CommentsMap>(() => {
     // Seed from cache on first render before the fetch resolves
     if (Object.keys(_data).length === 0) {
-      const cached = readCache()
+      const cached = lsGet<CommentsMap>(LS_KEY)
       if (cached) _data = cached
     }
     return _data
@@ -69,7 +45,7 @@ export function useComments() {
       .then((r) => r.json())
       .then((rows: { id: string; entity_id: string; text: string; created_at: number }[]) => {
         if (!Array.isArray(rows)) {
-          const cached = readCache()
+          const cached = lsGet<CommentsMap>(LS_KEY)
           if (cached) setGlobalData(() => cached)
           return
         }
@@ -81,12 +57,12 @@ export function useComments() {
         if (rows.length > 0) {
           setGlobalData(() => grouped)
         } else {
-          const cached = readCache()
+          const cached = lsGet<CommentsMap>(LS_KEY)
           if (cached && Object.keys(cached).length > 0) setGlobalData(() => cached)
         }
       })
       .catch(() => {
-        const cached = readCache()
+        const cached = lsGet<CommentsMap>(LS_KEY)
         if (cached) setGlobalData(() => cached)
       })
   }, [])

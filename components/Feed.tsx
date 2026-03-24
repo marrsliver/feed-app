@@ -227,7 +227,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const { sourceLists, createSourceList, deleteSourceList, renameSourceList, toggleSourceInList } = useSourceLists()
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
-  const { spaces, lists, createSpace, createList, deleteList, renameList, addNote, addPost: addPostToSpace } = useSpaces()
+  const { spaces, lists, createSpace, createList, deleteList, renameList, addNote, addPost: addPostToSpace, postToSpaces, commentToSpaces } = useSpaces()
   const { appendItem: appendSourceItem } = useSourceItems()
   const otherFeedId = feedId === 'research' ? 'music' : 'research'
   const { posts: manualPosts, addPost, movePost, removePost } = useManualPosts(feedId)
@@ -346,13 +346,19 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const canLoadMore = (hasNextPage && !isFetchingNextPage) || (userHasMore && !userSourcesLoading)
   const sentinelRef = useInfiniteScroll(loadMore, canLoadMore)
 
-  const fetchedPosts: Post[] = data?.pages.flatMap((p) => p.posts) ?? []
-  const seenIds = new Set<string>()
-  const filtered = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
-    .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
-    .filter((p) => !hiddenIds.includes(p.id))
-    .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
-  const allPosts = shuffleSeed !== null ? rankPostsDiversified(filtered, shuffleSeed) : rankPosts(filtered)
+  const fetchedPosts: Post[] = useMemo(
+    () => data?.pages.flatMap((p) => p.posts) ?? [],
+    [data]
+  )
+
+  const allPosts = useMemo(() => {
+    const seenIds = new Set<string>()
+    const filtered = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
+      .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
+      .filter((p) => !hiddenIds.includes(p.id))
+      .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
+    return shuffleSeed !== null ? rankPostsDiversified(filtered, shuffleSeed) : rankPosts(filtered)
+  }, [manualPosts, fetchedPosts, accumulatedUserPosts, hiddenIds, activeSources, shuffleSeed])
   const activeList = lists.find((l) => l.id === view)
   const listFiltered =
     view === 'all'
@@ -372,36 +378,6 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const sourcesCardsPanelSource = sourcesCardsPanelId
     ? allSources.find((s) => s.id === sourcesCardsPanelId) ?? null
     : null
-
-  // postId → spaces that contain this post
-  const postToSpaces = useMemo(() => {
-    const map: Record<string, { id: string; name: string }[]> = {}
-    for (const space of spaces.filter(s => !s.deletedAt)) {
-      for (const item of space.items) {
-        if (item.type === 'post' && item.refId) {
-          map[item.refId] ??= []
-          if (!map[item.refId].some(s => s.id === space.id))
-            map[item.refId].push({ id: space.id, name: space.name })
-        }
-      }
-    }
-    return map
-  }, [spaces])
-
-  // commentId → spaces that have a note referencing this comment
-  const commentToSpaces = useMemo(() => {
-    const map: Record<string, { id: string; name: string }[]> = {}
-    for (const space of spaces.filter(s => !s.deletedAt)) {
-      for (const item of space.items) {
-        if (item.type === 'note' && item.commentId) {
-          map[item.commentId] ??= []
-          if (!map[item.commentId].some(s => s.id === space.id))
-            map[item.commentId].push({ id: space.id, name: space.name })
-        }
-      }
-    }
-    return map
-  }, [spaces])
 
   // Sources for the filter bar (static + user in-feed for this feedId), alphabetized
   const filterSources = useMemo(() => [

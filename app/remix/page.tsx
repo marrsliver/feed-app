@@ -27,6 +27,7 @@ import { useSourceCategories } from '@/hooks/useSourceCategories'
 import { useSourceIndustries } from '@/hooks/useSourceIndustries'
 import { useComments } from '@/hooks/useComments'
 import { useSourceItems } from '@/hooks/useSourceItems'
+import { usePanelStack } from '@/hooks/usePanelStack'
 import { pushUndo } from '@/lib/undoStack'
 import type { Space, SpaceItem, SpaceItemVersion, Post, LibrarySource, SpaceFolder } from '@/lib/types'
 
@@ -1617,6 +1618,7 @@ function RemixPageInner() {
     renameSpace, updateDescription, addPost, addNote, addSource, addMedia,
     nestSpace, removeItem, reorderItems, updateItem, appendItem, updateSpaceTags,
     updateItemByGroupId: updateSpaceItemByGroupId,
+    postToSpaces, commentToSpaces,
   } = useSpaces()
 
   const { folders, trashedFolders, createFolder, renameFolder, deleteFolder, restoreFolder, permanentDeleteFolder, addSpaceToFolder, removeSpaceFromFolder, getFolderForSpace, reorderFolders, sidebarOrder, updateSidebarOrder } = useSpaceFolders()
@@ -1650,10 +1652,17 @@ function RemixPageInner() {
   const { categories, createCategory } = useSourceCategories()
   const { industries, createIndustry } = useSourceIndustries()
   const { addComment } = useComments()
-  const [openSourcePanelId, setOpenSourcePanelId] = useState<string | null>(null)
-  const openSourcePanel = openSourcePanelId ? (sources.find((s) => s.id === openSourcePanelId) ?? null) : null
-  const [openPostPanel, setOpenPostPanel] = useState<Post | null>(null)
-  const [openPostPanelItem, setOpenPostPanelItem] = useState<SpaceItem | null>(null)
+  const {
+    openSourcePanelId,
+    openSourcePanel,
+    openPostPanel,
+    openPostPanelItem,
+    panelHistory,
+    openSource,
+    openPost,
+    back: panelBack,
+    close: handleRemixPanelClose,
+  } = usePanelStack(sources)
   const [connectingItem, setConnectingItem] = useState<SpaceItem | null>(null)
   const [pendingPost, setPendingPost] = useState<Post | null>(null)
   const [pendingSourceId, setPendingSourceId] = useState<string | null>(null)
@@ -1662,72 +1671,18 @@ function RemixPageInner() {
   const [noteForSpace, setNoteForSpace] = useState<{ content: string; sourceRef?: string; commentId?: string } | null>(null)
   const [noteForSpaceNewName, setNoteForSpaceNewName] = useState('')
 
-  const [panelHistory, setPanelHistory] = useState<Array<{ type: 'source'; id: string } | { type: 'post'; post: Post }>>([])
-
-  // Only one inline panel open at a time
+  // Only one inline panel open at a time.
+  // Accepts LibrarySource | null to match the onOpenSourcePanel prop type expected by SpaceWorkspace.
   function openSourcePanelExclusive(src: LibrarySource | null, skipHistory = false) {
-    if (!skipHistory && src && openPostPanel) {
-      setPanelHistory(h => [...h, { type: 'post', post: openPostPanel }])
-    }
-    setOpenSourcePanelId(src?.id ?? null)
-    if (src) setOpenPostPanel(null)
+    if (src) openSource(src.id, skipHistory)
   }
   function openPostPanelExclusive(post: Post | null, item?: SpaceItem, skipHistory = false) {
-    if (!skipHistory && post && openSourcePanelId) {
-      setPanelHistory(h => [...h, { type: 'source', id: openSourcePanelId }])
-    }
-    setOpenPostPanel(post)
-    setOpenPostPanelItem(item ?? null)
-    if (post) setOpenSourcePanelId(null)
+    openPost(post, item, skipHistory)
   }
   function handleRemixPanelBack() {
-    const last = panelHistory[panelHistory.length - 1]
-    if (!last) { handleRemixPanelClose(); return }
-    setPanelHistory(h => h.slice(0, -1))
-    if (last.type === 'source') {
-      const src = sources.find(s => s.id === last.id)
-      if (src) { setOpenSourcePanelId(last.id); setOpenPostPanel(null) }
-    } else {
-      setOpenPostPanel(last.post); setOpenPostPanelItem(null); setOpenSourcePanelId(null)
-    }
+    // Pass existence check — remix page only restores source panel if source still exists
+    panelBack((id) => !!sources.find(s => s.id === id))
   }
-  function handleRemixPanelClose() {
-    setPanelHistory([])
-    setOpenSourcePanelId(null)
-    setOpenPostPanel(null)
-    setOpenPostPanelItem(null)
-  }
-
-  const commentToSpaces = useMemo(() => {
-    const map: Record<string, { id: string; name: string }[]> = {}
-    for (const space of spaces.filter(s => !s.deletedAt)) {
-      for (const item of space.items) {
-        if (item.type === 'note' && item.commentId) {
-          map[item.commentId] ??= []
-          if (!map[item.commentId].some(s => s.id === space.id)) {
-            map[item.commentId].push({ id: space.id, name: space.name })
-          }
-        }
-      }
-    }
-    return map
-  }, [spaces])
-
-  const postToSpaces = useMemo(() => {
-    const map: Record<string, { id: string; name: string }[]> = {}
-    for (const space of spaces.filter(s => !s.deletedAt)) {
-      for (const item of space.items) {
-        if (item.type === 'post' && item.postData) {
-          const pid = item.postData.id
-          map[pid] ??= []
-          if (!map[pid].some(s => s.id === space.id)) {
-            map[pid].push({ id: space.id, name: space.name })
-          }
-        }
-      }
-    }
-    return map
-  }, [spaces])
 
   const spacesRef = useRef(spaces)
   useEffect(() => { spacesRef.current = spaces }, [spaces])

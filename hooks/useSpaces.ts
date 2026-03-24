@@ -1,38 +1,26 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Space, SpaceItem, Post } from '@/lib/types'
-import { queueWrite, clearWrite } from '@/lib/pendingWrites'
-import { notifyPendingWritesChanged } from './usePendingWrites'
+import { persist } from '@/lib/persist'
+import { lsGet, lsSet } from '@/lib/localStorage'
 
 const LS_KEY = 'saved_lists_cache_v1'
 const TRASH_KEY = 'spaces_trash_v1'
 const DELETED_IDS_KEY = 'spaces_deleted_ids_v1'
 
-function readCache(): Space[] | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as Space[]
-  } catch { return null }
-}
-
-function writeCache(spaces: Space[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(spaces)) } catch { /* ignore */ }
-}
-
 function readTrash(): Space[] {
-  try { return JSON.parse(localStorage.getItem(TRASH_KEY) ?? '[]') } catch { return [] }
+  return lsGet<Space[]>(TRASH_KEY) ?? []
 }
 function writeTrash(s: Space[]) {
-  try { localStorage.setItem(TRASH_KEY, JSON.stringify(s)) } catch { /* ignore */ }
+  lsSet(TRASH_KEY, s)
 }
 
 function readDeletedIds(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(DELETED_IDS_KEY) ?? '[]')) } catch { return new Set() }
+  return new Set(lsGet<string[]>(DELETED_IDS_KEY) ?? [])
 }
 function writeDeletedIds(ids: Set<string>) {
-  try { localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...ids])) } catch { /* ignore */ }
+  lsSet(DELETED_IDS_KEY, [...ids])
 }
 
 // Cross-instance sync: all useSpaces() instances share state via a custom event.
@@ -44,18 +32,6 @@ function notifySpacesChanged(spaces: Space[]) {
   setTimeout(() => {
     window.dispatchEvent(new CustomEvent(SPACES_EVENT, { detail: spaces }))
   }, 0)
-}
-
-function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
-  const writeId = queueWrite(url, method, body)
-  notifyPendingWritesChanged()
-  fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
-    .catch(() => { /* stays in queue until replayed */ })
 }
 
 function makeItemId(): string {
@@ -87,7 +63,7 @@ function applyUpdate(
 export function useSpaces() {
   const [spaces, setSpaces] = useState<Space[]>(() => {
     const deletedIds = readDeletedIds()
-    return (readCache() ?? []).map(migrateSpace).filter((s) => !deletedIds.has(s.id))
+    return (lsGet<Space[]>(LS_KEY) ?? []).map(migrateSpace).filter((s) => !deletedIds.has(s.id))
   })
   const [trashedSpaces, setTrashedSpaces] = useState<Space[]>(() => readTrash())
   const [loaded, setLoaded] = useState(false)
@@ -112,7 +88,7 @@ export function useSpaces() {
         if (Array.isArray(data) && data.length > 0) {
           // Preserve locally-stored tags (not yet in DB)
           const localTags: Record<string, string[]> = {}
-          const cached = readCache()
+          const cached = lsGet<Space[]>(LS_KEY)
           if (cached) cached.forEach((s) => { if (s.tags?.length) localTags[s.id] = s.tags })
           const migrated = data.map((d) => migrateSpace({ ...d, tags: localTags[d.id] ?? d.tags ?? [] }))
           // Persist any migrated spaces
@@ -124,10 +100,10 @@ export function useSpaces() {
           })
           const deletedIds = readDeletedIds()
           const active = migrated.filter((s) => !deletedIds.has(s.id))
-          writeCache(active)
+          lsSet(LS_KEY, active)
           setSpaces(active)
         } else {
-          const cached = readCache()
+          const cached = lsGet<Space[]>(LS_KEY)
           if (cached && cached.length > 0) {
             const deletedIds = readDeletedIds()
             setSpaces(cached.map(migrateSpace).filter((s) => !deletedIds.has(s.id)))
@@ -136,7 +112,7 @@ export function useSpaces() {
         setLoaded(true)
       })
       .catch(() => {
-        const cached = readCache()
+        const cached = lsGet<Space[]>(LS_KEY)
         if (cached) setSpaces(cached.map(migrateSpace))
         setLoaded(true)
       })
@@ -148,7 +124,7 @@ export function useSpaces() {
   const patchSpace = useCallback((spaceId: string, mutate: (s: Space) => Space) => {
     setSpaces((prev) => {
       const next = applyUpdate(prev, spaceId, mutate)
-      writeCache(next)
+      lsSet(LS_KEY, next)
       notifySpacesChanged(next)
       return next
     })
@@ -158,7 +134,7 @@ export function useSpaces() {
     const id = Date.now().toString()
     const newSpace: Space = { id, name: name.trim(), items: [], createdAt: Date.now() }
     spacesRef.current = [...spacesRef.current, newSpace]
-    setSpaces((prev) => { const next = [...prev, newSpace]; writeCache(next); notifySpacesChanged(next); return next })
+    setSpaces((prev) => { const next = [...prev, newSpace]; lsSet(LS_KEY, next); notifySpacesChanged(next); return next })
     persist('/api/db/lists', 'POST', newSpace)
     return id
   }, [])
@@ -172,7 +148,7 @@ export function useSpaces() {
     writeTrash(newTrash)
     setTrashedSpaces(newTrash)
     const ids = readDeletedIds(); ids.add(id); writeDeletedIds(ids)
-    setSpaces((prev) => { const next = prev.filter((s) => s.id !== id); writeCache(next); notifySpacesChanged(next); return next })
+    setSpaces((prev) => { const next = prev.filter((s) => s.id !== id); lsSet(LS_KEY, next); notifySpacesChanged(next); return next })
   }, [])
 
   const restoreSpace = useCallback((id: string) => {
@@ -184,7 +160,7 @@ export function useSpaces() {
     writeTrash(newTrash)
     setTrashedSpaces(newTrash)
     const ids = readDeletedIds(); ids.delete(id); writeDeletedIds(ids)
-    setSpaces((prev) => { const next = [...prev, restored]; writeCache(next); notifySpacesChanged(next); return next })
+    setSpaces((prev) => { const next = [...prev, restored]; lsSet(LS_KEY, next); notifySpacesChanged(next); return next })
   }, [])
 
   const permanentDeleteSpace = useCallback((id: string) => {
@@ -319,6 +295,49 @@ export function useSpaces() {
     }
   }, [mutateItems])
 
+  // Map from post ID → array of {id, name} spaces that contain it
+  // Updated only when spaces change — avoids O(n×m) recompute in consumers
+  const postToSpaces = useMemo(() => {
+    const map: Record<string, { id: string; name: string }[]> = {}
+    for (const space of spaces) {
+      if (space.deletedAt) continue
+      for (const item of space.items) {
+        // Index by postData.id (for posts)
+        if (item.postData?.id) {
+          const key = item.postData.id
+          if (!map[key]) map[key] = []
+          if (!map[key].some(s => s.id === space.id))
+            map[key].push({ id: space.id, name: space.name })
+        }
+        // Also index by refId so both lookup strategies work
+        if (item.type === 'post' && item.refId && item.refId !== item.postData?.id) {
+          const key = item.refId
+          if (!map[key]) map[key] = []
+          if (!map[key].some(s => s.id === space.id))
+            map[key].push({ id: space.id, name: space.name })
+        }
+      }
+    }
+    return map
+  }, [spaces])
+
+  // Map from comment ID → array of {id, name} spaces that have a note for that comment
+  const commentToSpaces = useMemo(() => {
+    const map: Record<string, { id: string; name: string }[]> = {}
+    for (const space of spaces) {
+      if (space.deletedAt) continue
+      for (const item of space.items) {
+        if (item.type === 'note' && item.commentId) {
+          const key = item.commentId
+          if (!map[key]) map[key] = []
+          if (!map[key].some(s => s.id === space.id))
+            map[key].push({ id: space.id, name: space.name })
+        }
+      }
+    }
+    return map
+  }, [spaces])
+
   return {
     spaces,
     lists: spaces,
@@ -345,6 +364,8 @@ export function useSpaces() {
     isInAnyList,
     updateSpaceTags,
     updateItemByGroupId,
+    postToSpaces,
+    commentToSpaces,
     // legacy aliases
     createList: createSpace,
     deleteList: deleteSpace,

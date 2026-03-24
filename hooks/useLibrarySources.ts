@@ -3,20 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { LibrarySource, SourceCard } from '@/lib/types'
 import { researchSources, musicSources } from '@/lib/sources.config'
-import { queueWrite, clearWrite } from '@/lib/pendingWrites'
-import { notifyPendingWritesChanged } from './usePendingWrites'
-
-function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
-  const writeId = queueWrite(url, method, body)
-  notifyPendingWritesChanged()
-  fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
-    .catch(() => { /* stays in queue until replayed */ })
-}
+import { persist } from '@/lib/persist'
+import { lsGet, lsSet } from '@/lib/localStorage'
 
 const COLORS = [
   '#6366f1', '#10b981', '#f59e0b', '#ef4444',
@@ -41,28 +29,10 @@ const LS_CACHE_KEY = 'library_sources_cache_v1'
 const LS_ASSOCIATIONS_KEY = 'source_associations_v1'
 
 function readAssociations(): Record<string, string[]> {
-  try { return JSON.parse(localStorage.getItem(LS_ASSOCIATIONS_KEY) ?? '{}') } catch { return {} }
+  return lsGet<Record<string, string[]>>(LS_ASSOCIATIONS_KEY) ?? {}
 }
 function writeAssociations(a: Record<string, string[]>) {
-  try { localStorage.setItem(LS_ASSOCIATIONS_KEY, JSON.stringify(a)) } catch { /* ignore */ }
-}
-
-function readCache(): LibrarySource[] | null {
-  try {
-    const raw = localStorage.getItem(LS_CACHE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as LibrarySource[]
-  } catch {
-    return null
-  }
-}
-
-function writeCache(sources: LibrarySource[]) {
-  try {
-    localStorage.setItem(LS_CACHE_KEY, JSON.stringify(sources))
-  } catch {
-    // localStorage full or unavailable — not fatal
-  }
+  lsSet(LS_ASSOCIATIONS_KEY, a)
 }
 
 // Merge DB data with hardcoded statics:
@@ -90,12 +60,12 @@ export function useLibrarySources() {
         if (data.length > 0) {
           // DB returned real data — merge, cache, and use it
           const merged = withAssocs(mergeSources(data))
-          writeCache(merged)
+          lsSet(LS_CACHE_KEY, merged)
           setSources(merged)
         } else {
           // DB returned empty — could be a Supabase pause or blip
           // Fall back to localStorage cache to preserve user's work
-          const cached = readCache()
+          const cached = lsGet<LibrarySource[]>(LS_CACHE_KEY)
           if (cached && cached.length > 0) {
             setSources(withAssocs(cached))
           } else {
@@ -109,7 +79,7 @@ export function useLibrarySources() {
         // Network or DB error — same fallback chain
         const assocs = readAssociations()
         const withAssocs = (srcs: LibrarySource[]) => srcs.map(s => ({ ...s, associations: assocs[s.id] ?? s.associations ?? [] }))
-        const cached = readCache()
+        const cached = lsGet<LibrarySource[]>(LS_CACHE_KEY)
         if (cached && cached.length > 0) {
           setSources(withAssocs(cached))
         } else {
@@ -131,7 +101,7 @@ export function useLibrarySources() {
   const updateSources = useCallback((updater: (prev: LibrarySource[]) => LibrarySource[]) => {
     setSources((prev) => {
       const next = updater(prev)
-      writeCache(next)
+      lsSet(LS_CACHE_KEY, next)
       return next
     })
   }, [])

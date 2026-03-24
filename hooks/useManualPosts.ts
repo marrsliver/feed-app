@@ -1,62 +1,41 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
 import type { Post } from '@/lib/types'
-import { queueWrite, clearWrite } from '@/lib/pendingWrites'
-import { notifyPendingWritesChanged } from './usePendingWrites'
-
-function persist(url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) {
-  const writeId = queueWrite(url, method, body)
-  notifyPendingWritesChanged()
-  fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-    .then((r) => { if (r.ok) { clearWrite(writeId); notifyPendingWritesChanged() } })
-    .catch(() => { /* stays in queue until replayed */ })
-}
+import { persist } from '@/lib/persist'
+import { lsGet, lsSet } from '@/lib/localStorage'
+import { useCachedAPI } from '@/hooks/useCachedAPI'
 
 type ManualRecord = { feedId: string; post: Post; addedAt: number }
 
 const LS_KEY = 'manual_posts_cache_v1'
 
-function readCache(): ManualRecord[] | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as ManualRecord[]
-  } catch { return null }
-}
-
-function writeCache(records: ManualRecord[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(records)) } catch { /* ignore */ }
-}
-
 export function useManualPosts(feedId: string) {
-  const [allPosts, setAllPosts] = useState<ManualRecord[]>(() => readCache() ?? [])
+  const [allPosts, setAllPosts] = useCachedAPI<ManualRecord[]>(
+    '/api/db/manual-posts',
+    LS_KEY,
+    [],
+  )
 
+  // Re-read when a post is restored from the archive (event-driven re-fetch)
   const loadFromDB = useCallback(() => {
     fetch('/api/db/manual-posts')
       .then((r) => r.json())
       .then((data: ManualRecord[]) => {
         if (Array.isArray(data) && data.length > 0) {
-          writeCache(data)
+          lsSet(LS_KEY, data)
           setAllPosts(data)
         } else {
-          const cached = readCache()
+          const cached = lsGet<ManualRecord[]>(LS_KEY)
           if (cached && cached.length > 0) setAllPosts(cached)
         }
       })
       .catch(() => {
-        const cached = readCache()
+        const cached = lsGet<ManualRecord[]>(LS_KEY)
         if (cached) setAllPosts(cached)
       })
-  }, [])
+  }, [setAllPosts])
 
-  useEffect(() => { loadFromDB() }, [loadFromDB])
-
-  // Re-read when a post is restored from the archive
   useEffect(() => {
     window.addEventListener('manual-posts-updated', loadFromDB)
     return () => window.removeEventListener('manual-posts-updated', loadFromDB)
@@ -65,7 +44,7 @@ export function useManualPosts(feedId: string) {
   const updatePosts = useCallback((updater: (prev: ManualRecord[]) => ManualRecord[]) => {
     setAllPosts((prev) => {
       const next = updater(prev)
-      writeCache(next)
+      lsSet(LS_KEY, next)
       return next
     })
   }, [])
