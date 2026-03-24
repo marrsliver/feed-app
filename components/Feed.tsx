@@ -189,6 +189,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     setOpenPieceModal(null)
     setSourceOpenedFromPost(false)
   }
+  const [includeAssociated, setIncludeAssociated] = useState(false)
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [shuffleSeed, setShuffleSeed] = useState<number | null>(null)
   const [selectSourcesOpen, setSelectSourcesOpen] = useState(false)
@@ -351,14 +352,27 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     [data]
   )
 
+  // Compute associated source IDs for the active filter sources
+  const associatedSourceIds = useMemo(() => {
+    if (activeSources.size === 0) return new Set<string>()
+    const extra = new Set<string>()
+    for (const source of allSources) {
+      if (!activeSources.has(source.id)) continue
+      for (const assocId of source.associations ?? []) {
+        if (!activeSources.has(assocId)) extra.add(assocId)
+      }
+    }
+    return extra
+  }, [activeSources, allSources])
+
   const allPosts = useMemo(() => {
     const seenIds = new Set<string>()
     const filtered = [...manualPosts, ...fetchedPosts, ...accumulatedUserPosts]
       .filter((p) => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true })
       .filter((p) => !hiddenIds.includes(p.id))
-      .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId))
+      .filter((p) => p.sourceId === 'manual' || activeSources.has(p.sourceId) || (includeAssociated && associatedSourceIds.has(p.sourceId)))
     return shuffleSeed !== null ? rankPostsDiversified(filtered, shuffleSeed) : rankPosts(filtered)
-  }, [manualPosts, fetchedPosts, accumulatedUserPosts, hiddenIds, activeSources, shuffleSeed])
+  }, [manualPosts, fetchedPosts, accumulatedUserPosts, hiddenIds, activeSources, includeAssociated, associatedSourceIds, shuffleSeed])
   const activeList = lists.find((l) => l.id === view)
   const listFiltered =
     view === 'all'
@@ -384,6 +398,11 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     ...feedStaticSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
     ...feedUserSources.map((s) => ({ id: s.id, name: s.name, url: s.url, type: s.type, color: s.color, feedUrl: s.feedUrl, categoryId: s.categoryId, industryId: s.industryId })),
   ].sort((a, b) => a.name.localeCompare(b.name)), [feedStaticSources, feedUserSources])
+
+  // Reset includeAssociated when filter is cleared
+  useEffect(() => {
+    if (activeSources.size === 0) setIncludeAssociated(false)
+  }, [activeSources.size])
 
   return (
     <>
@@ -529,6 +548,9 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
               active={activeSources}
               onToggle={toggleSource}
               onReset={() => setActiveSources(new Set(allSourceIds))}
+              onToggleIncludeAssociated={() => setIncludeAssociated(v => !v)}
+              includeAssociated={includeAssociated}
+              associatedCount={associatedSourceIds.size}
             />
           </div>
         </div>

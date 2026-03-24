@@ -150,11 +150,12 @@ interface Props {
   onAddAssociation?: (targetId: string) => void
   onRemoveAssociation?: (targetId: string) => void
   onOpenAssociation?: (source: LibrarySource) => void
+  onNavigateToSourceSpace?: (source: LibrarySource) => void
   onChangePieceSource?: (card: SourceCard) => void
   onShowPieceOnAssociations?: (card: SourceCard, targetSourceIds: string[]) => void
 }
 
-export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces, onSetSummary, onAddPieceToSpace, allLibrarySources, onAddAssociation, onRemoveAssociation, onOpenAssociation, onChangePieceSource, onShowPieceOnAssociations }: Props) {
+export function SourcePanel({ source, categories, industries = [], allTags, sourceLists, onSetCategory, onSetIndustry, onAddTag, onRemoveTag, onToggleSourceInList, onCreateSourceList, onPromoteTag, onTagClick, onCreateCategory, onCreateIndustry, onRenameSource, onBack, onClose, topLayer, inline, allFeedPosts, savedLists, isRead, onAddNoteToSpace, onAddSourceCard, onRemoveSourceCard, onNavigateToSpace, onCommentEdited, onOpenPiece, onAddSourceToSpace, allSpaces, commentToSpaces, onSetSummary, onAddPieceToSpace, allLibrarySources, onAddAssociation, onRemoveAssociation, onOpenAssociation, onNavigateToSourceSpace, onChangePieceSource, onShowPieceOnAssociations }: Props) {
   const { addComment, deleteComment, editComment, getComments } = useComments()
   const { getSourceConnections } = useKnowledgeGraph()
   const connections = getSourceConnections(source.id)
@@ -452,6 +453,15 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: target.color }} />
                             {target.name}
                           </button>
+                          {onNavigateToSourceSpace && (
+                            <button
+                              onClick={() => onNavigateToSourceSpace(target)}
+                              className="p-1 text-black/30 hover:text-black/70 transition-colors"
+                              title="Go to their space"
+                            >
+                              <ArrowUpRight size={11} />
+                            </button>
+                          )}
                           {onRemoveAssociation && (
                             <button
                               onClick={() => onRemoveAssociation(targetId)}

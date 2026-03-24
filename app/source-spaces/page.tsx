@@ -1012,6 +1012,28 @@ function SourceSpacesPageInner() {
                             {catExpanded && catSources.map(s => (
                               <div key={s.id} className="pl-6">
                                 <SourceRow source={s} active={selectedSourceId === s.id} onClick={() => setSelectedSourceId(s.id)} />
+                                {selectedSourceId === s.id && (s.associations ?? []).length > 0 && (
+                                  <div className="ml-3 border-l border-black/10 pl-2 space-y-0.5 mt-0.5 mb-1">
+                                    {(s.associations ?? []).map(assocId => {
+                                      const assoc = sources.find(src => src.id === assocId)
+                                      if (!assoc) return null
+                                      return (
+                                        <button
+                                          key={assocId}
+                                          onClick={() => setSelectedSourceId(assocId)}
+                                          className={`w-full text-left flex items-center gap-1.5 px-2 py-1 text-[11px] transition-colors ${
+                                            selectedSourceId === assocId
+                                              ? 'text-black font-medium'
+                                              : 'text-black/40 hover:text-black/70'
+                                          }`}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: assoc.color }} />
+                                          <span className="truncate">{assoc.name}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1022,6 +1044,28 @@ function SourceSpacesPageInner() {
                       {group.uncategorized.map(s => (
                         <div key={s.id} className="pl-4">
                           <SourceRow source={s} active={selectedSourceId === s.id} onClick={() => setSelectedSourceId(s.id)} />
+                          {selectedSourceId === s.id && (s.associations ?? []).length > 0 && (
+                            <div className="ml-3 border-l border-black/10 pl-2 space-y-0.5 mt-0.5 mb-1">
+                              {(s.associations ?? []).map(assocId => {
+                                const assoc = sources.find(src => src.id === assocId)
+                                if (!assoc) return null
+                                return (
+                                  <button
+                                    key={assocId}
+                                    onClick={() => setSelectedSourceId(assocId)}
+                                    className={`w-full text-left flex items-center gap-1.5 px-2 py-1 text-[11px] transition-colors ${
+                                      selectedSourceId === assocId
+                                        ? 'text-black font-medium'
+                                        : 'text-black/40 hover:text-black/70'
+                                    }`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: assoc.color }} />
+                                    <span className="truncate">{assoc.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1039,7 +1083,31 @@ function SourceSpacesPageInner() {
                   </div>
                 )}
                 {sourceTree.noIndustry.map(s => (
-                  <SourceRow key={s.id} source={s} active={selectedSourceId === s.id} onClick={() => setSelectedSourceId(s.id)} />
+                  <div key={s.id}>
+                    <SourceRow source={s} active={selectedSourceId === s.id} onClick={() => setSelectedSourceId(s.id)} />
+                    {selectedSourceId === s.id && (s.associations ?? []).length > 0 && (
+                      <div className="ml-3 border-l border-black/10 pl-2 space-y-0.5 mt-0.5 mb-1">
+                        {(s.associations ?? []).map(assocId => {
+                          const assoc = sources.find(src => src.id === assocId)
+                          if (!assoc) return null
+                          return (
+                            <button
+                              key={assocId}
+                              onClick={() => setSelectedSourceId(assocId)}
+                              className={`w-full text-left flex items-center gap-1.5 px-2 py-1 text-[11px] transition-colors ${
+                                selectedSourceId === assocId
+                                  ? 'text-black font-medium'
+                                  : 'text-black/40 hover:text-black/70'
+                              }`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: assoc.color }} />
+                              <span className="truncate">{assoc.name}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -1127,6 +1195,10 @@ function SourceSpacesPageInner() {
               onAddAssociation={(targetId) => addAssociation(openSourcePanel.id, targetId)}
               onRemoveAssociation={(targetId) => removeAssociation(openSourcePanel.id, targetId)}
               onOpenAssociation={(src) => openSourcePanelFor(src.id)}
+              onNavigateToSourceSpace={(src) => {
+                setSelectedSourceId(src.id)
+                handlePanelClose()
+              }}
               onAddPieceToSpace={(spaceId, card) => {
                 const src = openSourcePanel
                 appendRemixItem(spaceId, {

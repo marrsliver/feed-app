@@ -7,9 +7,12 @@ interface Props {
   active: Set<string>
   onToggle: (id: string) => void
   onReset: () => void
+  onToggleIncludeAssociated?: () => void
+  includeAssociated?: boolean
+  associatedCount?: number
 }
 
-export function SourceFilter({ sources, active, onToggle, onReset }: Props) {
+export function SourceFilter({ sources, active, onToggle, onReset, onToggleIncludeAssociated, includeAssociated, associatedCount }: Props) {
   if (sources.length === 0) return null
 
   const allActive = sources.every((s) => active.has(s.id))
@@ -44,6 +47,19 @@ export function SourceFilter({ sources, active, onToggle, onReset }: Props) {
             </button>
           )
         })}
+        {onToggleIncludeAssociated && associatedCount !== undefined && associatedCount > 0 && (
+          <button
+            onClick={onToggleIncludeAssociated}
+            className={`shrink-0 text-[10px] flex items-center gap-1 px-2 py-0.5 border transition-colors ${
+              includeAssociated
+                ? 'border-black/40 bg-black text-white'
+                : 'border-black/15 text-black/40 hover:text-black/60 hover:border-black/30'
+            }`}
+          >
+            <span>{includeAssociated ? '✓' : '+'}</span>
+            <span>{associatedCount} related source{associatedCount !== 1 ? 's' : ''}</span>
+          </button>
+        )}
       </div>
       {/* Right fade — hints at overflow */}
       <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white to-transparent" />
