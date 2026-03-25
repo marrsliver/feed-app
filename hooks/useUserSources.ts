@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { UserSource } from '@/lib/types'
+import type { LibrarySource } from '@/lib/types'
 import { lsGet, lsSet } from '@/lib/localStorage'
 import { LS_KEYS } from '@/lib/storageKeys'
 
@@ -12,22 +12,22 @@ const COLORS = [
   '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16',
 ]
 
-export function useUserSources() {
+export function useLibrarySources() {
   // Seed immediately from cache so sources survive DB outages
-  const [sources, setSources] = useState<UserSource[]>(() => lsGet<UserSource[]>(LS_KEY) ?? [])
+  const [sources, setSources] = useState<LibrarySource[]>(() => lsGet<LibrarySource[]>(LS_KEY) ?? [])
 
   useEffect(() => {
     fetch('/api/db/user-sources')
       .then((r) => r.json())
       .then((data: unknown) => {
         if (!Array.isArray(data)) return
-        setSources(data as UserSource[])
+        setSources(data as LibrarySource[])
         lsSet(LS_KEY, data)
       })
       .catch(() => { /* already seeded from cache above */ })
   }, [])
 
-  const addSource = useCallback((source: Omit<UserSource, 'color' | 'addedAt'>) => {
+  const addSource = useCallback((source: Omit<LibrarySource, 'color' | 'addedAt'>) => {
     setSources((prev) => {
       if (prev.some((s) => s.feedUrl === source.feedUrl)) return prev
       const color = COLORS[prev.length % COLORS.length]

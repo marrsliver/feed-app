@@ -39,12 +39,11 @@ export interface LibrarySource {
   associations?: string[]  // IDs of other sources this source is associated with
 }
 
-// Aliases for transition compatibility
+// Narrowed type used by fetchers and sources.config (server-side only)
 export type Source = Pick<LibrarySource, 'id' | 'name' | 'url' | 'type' | 'color'> & {
   apiPath?: string
   feedUrl?: string
 }
-export type UserSource = LibrarySource
 
 export interface SourceCategory {
   id: string
@@ -123,8 +122,6 @@ export interface Space {
   postIds?: string[]
   postData?: Record<string, Post>
 }
-
-export type SavedList = Space
 
 export interface SpaceFolder {
   id: string
