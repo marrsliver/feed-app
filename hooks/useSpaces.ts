@@ -5,9 +5,10 @@ import type { Space, SpaceItem, Post } from '@/lib/types'
 import { persist } from '@/lib/persist'
 import { lsGet, lsSet } from '@/lib/localStorage'
 
-const LS_KEY = 'saved_lists_cache_v1'
-const TRASH_KEY = 'spaces_trash_v1'
-const DELETED_IDS_KEY = 'spaces_deleted_ids_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.SPACES
+const TRASH_KEY = LS_KEYS.SPACES_TRASH
+const DELETED_IDS_KEY = LS_KEYS.SPACES_DELETED_IDS
 
 function readTrash(): Space[] {
   return lsGet<Space[]>(TRASH_KEY) ?? []

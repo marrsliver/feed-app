@@ -13,7 +13,8 @@ export interface DeletedRecord {
   deletedAt: number
 }
 
-const LS_KEY = 'deleted_posts_cache_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.DELETED_POSTS
 
 export function useDeletedPosts() {
   const [records, setRecords] = useCachedAPI<DeletedRecord[]>(

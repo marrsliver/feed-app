@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
+import { parseBody, requireFields } from '@/lib/apiHelpers'
 
 export async function GET() {
   const { data, error } = await getSupabase()
@@ -29,7 +30,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { id, name, url, feedUrl, color, type, apiPath, inFeed, addedAt, isStatic, feedGroup, categoryId, industryId, tags, cards } = await req.json()
+  const { body, error: parseError } = await parseBody(req)
+  if (parseError) return parseError
+  const fieldError = requireFields(body, ['id', 'name', 'color'])
+  if (fieldError) return fieldError
+  const { id, name, url, feedUrl, color, type, apiPath, inFeed, addedAt, isStatic, feedGroup, categoryId, industryId, tags, cards } = body
   const { error } = await getSupabase()
     .from('user_sources')
     .insert({

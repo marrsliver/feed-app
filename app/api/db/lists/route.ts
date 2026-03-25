@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
+import { parseBody, requireFields } from '@/lib/apiHelpers'
 
 export async function GET() {
   const { data, error } = await getSupabase()
@@ -22,7 +23,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { id, name, postIds, postData, createdAt, description, items, updatedAt } = await req.json()
+  const { body, error: parseError } = await parseBody(req)
+  if (parseError) return parseError
+  const fieldError = requireFields(body, ['id', 'name'])
+  if (fieldError) return fieldError
+  const { id, name, postIds, postData, createdAt, description, items, updatedAt } = body
   const { error } = await getSupabase()
     .from('saved_lists')
     .insert({ id, name, post_ids: postIds, post_data: postData ?? {}, created_at: createdAt, description: description ?? null, items: items ?? [], updated_at: updatedAt ?? null })

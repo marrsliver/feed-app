@@ -8,7 +8,8 @@ import { useCachedAPI } from '@/hooks/useCachedAPI'
 
 type ManualRecord = { feedId: string; post: Post; addedAt: number }
 
-const LS_KEY = 'manual_posts_cache_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.MANUAL_POSTS
 
 export function useManualPosts(feedId: string) {
   const [allPosts, setAllPosts] = useCachedAPI<ManualRecord[]>(

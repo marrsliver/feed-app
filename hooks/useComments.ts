@@ -5,7 +5,8 @@ import type { Comment } from '@/lib/types'
 import { persist } from '@/lib/persist'
 import { lsGet, lsSet } from '@/lib/localStorage'
 
-const LS_KEY = 'comments_cache_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.COMMENTS
 type CommentsMap = Record<string, Comment[]>
 
 // ── Module-level singleton — all useComments() instances share this state ──────
@@ -43,18 +44,21 @@ export function useComments() {
     _fetched = true
     fetch('/api/db/comments')
       .then((r) => r.json())
-      .then((rows: { id: string; entity_id: string; text: string; created_at: number }[]) => {
+      .then((rows: unknown) => {
         if (!Array.isArray(rows)) {
+          // Bad response — fall back to cache, allow retry next mount
+          _fetched = false
           const cached = lsGet<CommentsMap>(LS_KEY)
           if (cached) setGlobalData(() => cached)
           return
         }
         const grouped: CommentsMap = {}
-        for (const row of rows) {
+        for (const row of rows as { id: string; entity_id: string; text: string; created_at: number }[]) {
           const c: Comment = { id: row.id, postId: row.entity_id, text: row.text, createdAt: row.created_at }
           grouped[row.entity_id] = [...(grouped[row.entity_id] ?? []), c]
         }
-        if (rows.length > 0) {
+        // Trust DB over cache; if DB returns empty and cache has data, keep cache
+        if (Object.keys(grouped).length > 0) {
           setGlobalData(() => grouped)
         } else {
           const cached = lsGet<CommentsMap>(LS_KEY)
@@ -62,6 +66,8 @@ export function useComments() {
         }
       })
       .catch(() => {
+        // Network failure — reset so the next mounted instance can retry
+        _fetched = false
         const cached = lsGet<CommentsMap>(LS_KEY)
         if (cached) setGlobalData(() => cached)
       })

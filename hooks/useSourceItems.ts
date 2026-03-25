@@ -3,7 +3,8 @@
 import { useState, useCallback } from 'react'
 import type { SpaceItem } from '@/lib/types'
 
-const LS_KEY = 'source_space_items_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.SOURCE_SPACE_ITEMS
 
 function readCache(): Record<string, SpaceItem[]> {
   try {

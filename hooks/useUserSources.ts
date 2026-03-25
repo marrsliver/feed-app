@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { UserSource } from '@/lib/types'
+import { lsGet, lsSet } from '@/lib/localStorage'
+import { LS_KEYS } from '@/lib/storageKeys'
+
+const LS_KEY = LS_KEYS.USER_SOURCES
 
 const COLORS = [
   '#6366f1', '#10b981', '#f59e0b', '#ef4444',
@@ -9,13 +13,18 @@ const COLORS = [
 ]
 
 export function useUserSources() {
-  const [sources, setSources] = useState<UserSource[]>([])
+  // Seed immediately from cache so sources survive DB outages
+  const [sources, setSources] = useState<UserSource[]>(() => lsGet<UserSource[]>(LS_KEY) ?? [])
 
   useEffect(() => {
     fetch('/api/db/user-sources')
       .then((r) => r.json())
-      .then((data: UserSource[]) => setSources(Array.isArray(data) ? data : []))
-      .catch(() => {})
+      .then((data: unknown) => {
+        if (!Array.isArray(data)) return
+        setSources(data as UserSource[])
+        lsSet(LS_KEY, data)
+      })
+      .catch(() => { /* already seeded from cache above */ })
   }, [])
 
   const addSource = useCallback((source: Omit<UserSource, 'color' | 'addedAt'>) => {
@@ -24,6 +33,7 @@ export function useUserSources() {
       const color = COLORS[prev.length % COLORS.length]
       const addedAt = Date.now()
       const next = [...prev, { ...source, color, addedAt }]
+      lsSet(LS_KEY, next)
       fetch('/api/db/user-sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,13 +44,18 @@ export function useUserSources() {
   }, [])
 
   const removeSource = useCallback((id: string) => {
-    setSources((prev) => prev.filter((s) => s.id !== id))
+    setSources((prev) => {
+      const next = prev.filter((s) => s.id !== id)
+      lsSet(LS_KEY, next)
+      return next
+    })
     fetch(`/api/db/user-sources/${id}`, { method: 'DELETE' }).catch(() => {})
   }, [])
 
   const toggleFeed = useCallback((id: string) => {
     setSources((prev) => {
       const next = prev.map((s) => s.id === id ? { ...s, inFeed: !s.inFeed } : s)
+      lsSet(LS_KEY, next)
       const updated = next.find((s) => s.id === id)
       if (updated) {
         fetch(`/api/db/user-sources/${id}`, {

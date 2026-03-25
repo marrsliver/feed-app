@@ -5,7 +5,8 @@ import type { SourceIndustry } from '@/lib/types'
 import { persist } from '@/lib/persist'
 import { lsGet, lsSet } from '@/lib/localStorage'
 
-const LS_KEY = 'source_industries_cache_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.SOURCE_INDUSTRIES
 
 const PREDEFINED_INDUSTRIES: SourceIndustry[] = [
   { id: 'music', name: 'Music' },

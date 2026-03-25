@@ -3,8 +3,9 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { SpaceFolder } from '@/lib/types'
 
-const LS_KEY = 'space_folders_v1'
-const SIDEBAR_KEY = 'sidebar_order_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.SPACE_FOLDERS
+const SIDEBAR_KEY = LS_KEYS.SIDEBAR_ORDER
 
 export type SidebarEntry = { type: 'folder' | 'space'; id: string }
 

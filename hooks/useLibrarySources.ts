@@ -25,8 +25,9 @@ const STATIC_LIBRARY_SOURCES: LibrarySource[] = [
   })),
 ]
 
-const LS_CACHE_KEY = 'library_sources_cache_v1'
-const LS_ASSOCIATIONS_KEY = 'source_associations_v1'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_CACHE_KEY = LS_KEYS.LIBRARY_SOURCES
+const LS_ASSOCIATIONS_KEY = LS_KEYS.SOURCE_ASSOCIATIONS
 
 function readAssociations(): Record<string, string[]> {
   return lsGet<Record<string, string[]>>(LS_ASSOCIATIONS_KEY) ?? {}

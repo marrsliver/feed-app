@@ -7,7 +7,8 @@
  * DELETE cancels any earlier queued writes to the same URL.
  */
 
-const LS_KEY = 'pending_writes_v2'
+import { LS_KEYS } from '@/lib/storageKeys'
+const LS_KEY = LS_KEYS.PENDING_WRITES
 
 export interface PendingWrite {
   id: string
