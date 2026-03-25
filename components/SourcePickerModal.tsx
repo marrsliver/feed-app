@@ -96,9 +96,12 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
   const [detectError, setDetectError] = useState('')
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null)
   const [pendingAdd, setPendingAdd] = useState<{ url: string; feedUrl: string; title: string } | null>(null)
+  const [manualMode, setManualMode] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualFeedUrl, setManualFeedUrl] = useState('')
   const newUrlRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { if (addingNew) newUrlRef.current?.focus() }, [addingNew])
+  useEffect(() => { if (addingNew && !manualMode) newUrlRef.current?.focus() }, [addingNew, manualMode])
 
   function findDuplicate(url: string, feedUrl: string): string | null {
     const norm = (u: string) => u.replace(/\/$/, '').toLowerCase()
@@ -116,6 +119,20 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
     onClose()
   }
 
+  function handleManualAdd() {
+    const name = manualName.trim()
+    const feedUrl = manualFeedUrl.trim()
+    const url = newUrl.trim() || feedUrl
+    if (!name || !feedUrl) return
+    const dup = findDuplicate(url, feedUrl)
+    if (dup) {
+      setPendingAdd({ url, feedUrl, title: name })
+      setDuplicateOf(dup)
+      return
+    }
+    commitAdd(url, feedUrl, name)
+  }
+
   async function handleAddNew() {
     const url = newUrl.trim()
     if (!url) return
@@ -128,7 +145,14 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
         body: JSON.stringify({ url }),
       })
       const data = await res.json()
-      if (!res.ok || data.error) { setDetectError(data.error ?? 'Could not detect feed'); setDetecting(false); return }
+      if (!res.ok || data.error) {
+        setDetectError(data.error ?? 'Could not detect feed')
+        setManualMode(true)
+        try { setManualName(new URL(url).hostname.replace(/^www\./, '')) } catch { /* ignore */ }
+        setManualFeedUrl(url)
+        setDetecting(false)
+        return
+      }
       const resolvedFeedUrl = data.feedUrl ?? url
       const title = data.title || new URL(url).hostname.replace(/^www\./, '')
       const dup = findDuplicate(url, resolvedFeedUrl)
@@ -141,6 +165,8 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
       commitAdd(url, resolvedFeedUrl, title)
     } catch {
       setDetectError('Network error — please try again')
+      setManualMode(true)
+      setManualFeedUrl(url)
     }
     setDetecting(false)
     setNewUrl('')
@@ -256,7 +282,7 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
                     className="text-[11px] bg-amber-700 text-white px-2.5 py-1 hover:bg-amber-800 transition-colors">
                     Add anyway
                   </button>
-                  <button onClick={() => { setDuplicateOf(null); setPendingAdd(null); setNewUrl(''); setAddingNew(false) }}
+                  <button onClick={() => { setDuplicateOf(null); setPendingAdd(null); setNewUrl(''); setManualMode(false); setManualName(''); setManualFeedUrl(''); setAddingNew(false) }}
                     className="text-[11px] text-black/40 hover:text-black px-2 py-1 transition-colors">
                     Cancel
                   </button>
@@ -264,24 +290,61 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
               </div>
             ) : addingNew ? (
               <div className="px-3 py-2.5 space-y-1.5">
-                <input
-                  ref={newUrlRef}
-                  value={newUrl}
-                  onChange={(e) => setNewUrl(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddNew(); if (e.key === 'Escape') { setAddingNew(false); setNewUrl('') } }}
-                  placeholder="https://example.com"
-                  className="w-full text-xs border border-black/15 px-2.5 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
-                />
-                {detectError && <p className="text-[10px] text-red-500">{detectError}</p>}
-                <div className="flex gap-2">
-                  <button onClick={handleAddNew} disabled={!newUrl.trim() || detecting}
-                    className="flex items-center gap-1.5 text-xs bg-black text-white px-3 py-1 hover:bg-black/80 transition-colors disabled:opacity-40">
-                    {detecting && <Loader2 size={10} className="animate-spin" />}
-                    {detecting ? 'Detecting…' : 'Add source'}
-                  </button>
-                  <button onClick={() => { setAddingNew(false); setNewUrl(''); setDetectError('') }}
-                    className="text-xs text-black/40 hover:text-black px-2 py-1 transition-colors">Cancel</button>
-                </div>
+                {!manualMode ? (
+                  <>
+                    <input
+                      ref={newUrlRef}
+                      value={newUrl}
+                      onChange={(e) => setNewUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddNew(); if (e.key === 'Escape') { setAddingNew(false); setNewUrl('') } }}
+                      placeholder="https://example.com"
+                      className="w-full text-xs border border-black/15 px-2.5 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                    />
+                    {detectError && (
+                      <p className="text-[10px] text-red-500">{detectError}</p>
+                    )}
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={handleAddNew} disabled={!newUrl.trim() || detecting}
+                        className="flex items-center gap-1.5 text-xs bg-black text-white px-3 py-1 hover:bg-black/80 transition-colors disabled:opacity-40">
+                        {detecting && <Loader2 size={10} className="animate-spin" />}
+                        {detecting ? 'Detecting…' : 'Auto-detect'}
+                      </button>
+                      <button onClick={() => { setManualMode(true); setManualFeedUrl(newUrl.trim()) }}
+                        className="text-xs text-black/40 hover:text-black px-2 py-1 transition-colors">
+                        Enter manually
+                      </button>
+                      <button onClick={() => { setAddingNew(false); setNewUrl(''); setDetectError('') }}
+                        className="text-xs text-black/30 hover:text-black px-2 py-1 transition-colors">Cancel</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[10px] text-black/40 font-medium uppercase tracking-wide">Manual entry</p>
+                    <input
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="Source name"
+                      className="w-full text-xs border border-black/15 px-2.5 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                    />
+                    <input
+                      value={manualFeedUrl}
+                      onChange={(e) => setManualFeedUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleManualAdd() }}
+                      placeholder="Feed URL (RSS/Atom)"
+                      className="w-full text-xs border border-black/15 px-2.5 py-1.5 outline-none focus:border-black/40 transition-colors placeholder:text-black/25"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={handleManualAdd} disabled={!manualName.trim() || !manualFeedUrl.trim()}
+                        className="text-xs bg-black text-white px-3 py-1 hover:bg-black/80 transition-colors disabled:opacity-40">
+                        Add source
+                      </button>
+                      <button onClick={() => { setManualMode(false); setDetectError('') }}
+                        className="text-xs text-black/40 hover:text-black px-2 py-1 transition-colors">Back</button>
+                      <button onClick={() => { setAddingNew(false); setNewUrl(''); setManualMode(false); setManualName(''); setManualFeedUrl(''); setDetectError('') }}
+                        className="text-xs text-black/30 hover:text-black px-2 py-1 transition-colors">Cancel</button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <button onClick={() => setAddingNew(true)}

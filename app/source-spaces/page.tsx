@@ -444,7 +444,17 @@ function SourceSpacesPageInner() {
                 items={selectedSourceItems}
                 allSources={sources}
                 allSpaces={spaces.filter(s => !s.deletedAt)}
-                onAppendItem={(item) => appendItem(selectedSource.id, item)}
+                onAppendItem={(item) => {
+                  appendItem(selectedSource.id, item)
+                  if (item.type === 'note' && item.content) {
+                    addSourceCard(selectedSource.id, {
+                      id: item.id,
+                      url: '',
+                      title: item.content.slice(0, 80),
+                      addedAt: item.addedAt,
+                    })
+                  }
+                }}
                 onRemoveItem={routeRemoveItem}
                 onUpdateItem={routeUpdateItem}
                 onReorderItems={routeReorderItems}
