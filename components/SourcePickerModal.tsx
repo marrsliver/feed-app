@@ -112,9 +112,9 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
     return match?.name ?? null
   }
 
-  function commitAdd(url: string, feedUrl: string, title: string) {
+  function commitAdd(url: string, feedUrl: string, title: string, force = false) {
     const id = `user-${Date.now()}`
-    addSource({ id, name: title || new URL(url).hostname.replace(/^www\./, ''), url, feedUrl, type: 'rss', inFeed: true, feedGroup: 'user' })
+    addSource({ id, name: title || new URL(url).hostname.replace(/^www\./, ''), url, feedUrl, type: 'rss', inFeed: true, feedGroup: 'user' }, force)
     onSelect(id)
     onClose()
   }
@@ -275,12 +275,20 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
           <div className="border-t border-black/10 shrink-0">
             {duplicateOf && pendingAdd ? (
               <div className="px-3 py-2.5 space-y-2 bg-amber-50 border-t border-amber-200">
-                <p className="text-[11px] text-amber-800 font-medium">Already in your library</p>
-                <p className="text-[10px] text-amber-700">"{duplicateOf}" has the same URL. Add as duplicate?</p>
+                <p className="text-[11px] text-amber-800 font-medium">Possible duplicate</p>
+                <p className="text-[10px] text-amber-700">"{duplicateOf}" shares the same feed URL. You can save this as a separate source with a different name.</p>
+                <input
+                  value={pendingAdd.title}
+                  onChange={(e) => setPendingAdd({ ...pendingAdd, title: e.target.value })}
+                  placeholder="Source name"
+                  className="w-full text-xs border border-amber-300 bg-white px-2.5 py-1.5 outline-none focus:border-amber-500 transition-colors placeholder:text-black/25"
+                />
                 <div className="flex gap-2 flex-wrap">
-                  <button onClick={() => { commitAdd(pendingAdd.url, pendingAdd.feedUrl, pendingAdd.title) }}
-                    className="text-[11px] bg-amber-700 text-white px-2.5 py-1 hover:bg-amber-800 transition-colors">
-                    Add anyway
+                  <button
+                    onClick={() => { commitAdd(pendingAdd.url, pendingAdd.feedUrl, pendingAdd.title, true) }}
+                    disabled={!pendingAdd.title.trim()}
+                    className="text-[11px] bg-amber-700 text-white px-2.5 py-1 hover:bg-amber-800 transition-colors disabled:opacity-40">
+                    Save anyway
                   </button>
                   <button onClick={() => { setDuplicateOf(null); setPendingAdd(null); setNewUrl(''); setManualMode(false); setManualName(''); setManualFeedUrl(''); setAddingNew(false) }}
                     className="text-[11px] text-black/40 hover:text-black px-2 py-1 transition-colors">
