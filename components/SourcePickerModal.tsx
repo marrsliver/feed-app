@@ -90,6 +90,7 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
   const { industries } = useSourceIndustries()
   const { addSource } = useLibrarySources()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null)
   const [addingNew, setAddingNew] = useState(false)
   const [newUrl, setNewUrl] = useState('')
   const [detecting, setDetecting] = useState(false)
@@ -177,15 +178,25 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
 
   const isSearching = query.trim().length > 0
 
-  const filteredFlat = useMemo(() => {
-    if (!isSearching) return []
-    const q = query.toLowerCase()
-    return sources
-      .filter((s) => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [sources, query, isSearching])
+  // Categories that have at least one source
+  const availableCategories = useMemo(() => {
+    const ids = new Set(sources.map(s => s.categoryId).filter(Boolean) as string[])
+    return categories.filter(c => ids.has(c.id)).sort((a, b) => a.name.localeCompare(b.name))
+  }, [sources, categories])
 
-  const groups = useMemo(() => buildGroups(sources, industries, categories), [sources, industries, categories])
+  const activeSources = useMemo(() =>
+    filterCategoryId ? sources.filter(s => s.categoryId === filterCategoryId) : sources
+  , [sources, filterCategoryId])
+
+  const filteredFlat = useMemo(() => {
+    if (!isSearching && !filterCategoryId) return []
+    const q = query.toLowerCase()
+    return activeSources
+      .filter((s) => !isSearching || s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [activeSources, query, isSearching, filterCategoryId])
+
+  const groups = useMemo(() => buildGroups(activeSources, industries, categories), [activeSources, industries, categories])
 
   function toggleCollapse(id: string) {
     setCollapsed((prev) => {
@@ -233,8 +244,35 @@ export function SourcePickerModal({ sources, onSelect, onClose, title = 'Add sou
             />
           </div>
 
+          {/* Category filter chips */}
+          {availableCategories.length > 0 && (
+            <div className="flex gap-1.5 px-3 py-2 border-b border-black/10 flex-wrap shrink-0">
+              {filterCategoryId && (
+                <button
+                  onClick={() => setFilterCategoryId(null)}
+                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 bg-black text-white"
+                >
+                  <X size={9} /> Clear
+                </button>
+              )}
+              {availableCategories.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setFilterCategoryId(filterCategoryId === c.id ? null : c.id)}
+                  className={`text-[10px] px-2 py-0.5 border transition-colors ${
+                    filterCategoryId === c.id
+                      ? 'bg-black text-white border-black'
+                      : 'border-black/20 text-black/50 hover:border-black/50 hover:text-black'
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto">
-            {isSearching ? (
+            {(isSearching || filterCategoryId) ? (
               filteredFlat.length === 0 ? (
                 <p className="text-center py-8 text-sm text-black/30">No sources found</p>
               ) : (

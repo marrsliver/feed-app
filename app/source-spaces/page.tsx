@@ -51,6 +51,7 @@ function SourceSpacesPageInner() {
 
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [sidebarSearch, setSidebarSearch] = useState('')
+  const [sidebarView, setSidebarView] = useState<'industry' | 'type'>('industry')
   const [connectingItem, setConnectingItem] = useState<SpaceItem | null>(null)
   const [addLinkOpen, setAddLinkOpen] = useState(false)
   const [addLinkSourceId, setAddLinkSourceId] = useState<string | null>(null)
@@ -194,6 +195,20 @@ function SourceSpacesPageInner() {
     return { industryMap, noIndustry }
   }, [filteredSources])
 
+  const typeTree = useMemo(() => {
+    const byCat = new Map<string, LibrarySource[]>()
+    const noCat: LibrarySource[] = []
+    for (const s of filteredSources) {
+      if (s.categoryId) {
+        if (!byCat.has(s.categoryId)) byCat.set(s.categoryId, [])
+        byCat.get(s.categoryId)!.push(s)
+      } else {
+        noCat.push(s)
+      }
+    }
+    return { byCat, noCat }
+  }, [filteredSources])
+
   function handleDuplicateAsSpace() {
     if (!selectedSource) return
     const items = getItems(selectedSource.id)
@@ -283,7 +298,71 @@ function SourceSpacesPageInner() {
             </div>
           </div>
 
+          {/* View toggle */}
+          <div className="flex border-b border-black/10 shrink-0">
+            {(['industry', 'type'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setSidebarView(v)}
+                className={`flex-1 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                  sidebarView === v ? 'text-black' : 'text-black/25 hover:text-black/50'
+                }`}
+              >
+                {v === 'industry' ? 'Industry' : 'Type'}
+              </button>
+            ))}
+          </div>
+
           <div className="flex-1 overflow-y-auto py-1">
+            {/* Type view — group by category across industries */}
+            {sidebarView === 'type' && (
+              <>
+                {[...typeTree.byCat.entries()].map(([catId, catSources]) => {
+                  const cat = categories.find(c => c.id === catId)
+                  const catLabel = cat?.name ?? catId
+                  const expanded = sidebarSearch ? true : expandedCategories.has(catId)
+                  return (
+                    <div key={catId}>
+                      <button
+                        onClick={() => toggleCategory(catId)}
+                        className="w-full flex items-center gap-1.5 px-3 py-2 hover:bg-black/3 transition-colors text-left"
+                      >
+                        {expanded ? <ChevronDown size={11} className="text-black/30 shrink-0" /> : <ChevronRight size={11} className="text-black/30 shrink-0" />}
+                        <span className="text-xs font-medium text-black/60 truncate">{catLabel}</span>
+                        <span className="text-[9px] text-black/25 ml-auto shrink-0">{catSources.length}</span>
+                      </button>
+                      {expanded && catSources.map(s => {
+                        const industry = industries.find(i => i.id === s.industryId)
+                        return (
+                          <div key={s.id} className="relative">
+                            <SourceRow source={s} active={selectedSourceId === s.id} onClick={() => setSelectedSourceId(s.id)} />
+                            {industry && (
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-black/25 pointer-events-none">
+                                {industry.name}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+                {typeTree.noCat.length > 0 && (
+                  <div>
+                    <div className="px-3 py-2 text-[10px] uppercase tracking-widest text-black/30 font-medium">Uncategorized</div>
+                    {typeTree.noCat.map(s => (
+                      <SourceRow key={s.id} source={s} active={selectedSourceId === s.id} onClick={() => setSelectedSourceId(s.id)} />
+                    ))}
+                  </div>
+                )}
+                {typeTree.byCat.size === 0 && typeTree.noCat.length === 0 && (
+                  <p className="text-center py-8 text-xs text-black/25">No sources</p>
+                )}
+              </>
+            )}
+
+            {/* Industry view — default */}
+            {sidebarView === 'industry' && <>
             {/* Industries */}
             {industries.map((industry) => {
               const group = sourceTree.industryMap.get(industry.id)
@@ -426,6 +505,7 @@ function SourceSpacesPageInner() {
             {filteredSources.length === 0 && (
               <p className="text-center py-10 text-xs text-black/25">{sidebarSearch ? 'No matches.' : 'No sources yet.'}</p>
             )}
+            </>}
           </div>
         </aside>
 
