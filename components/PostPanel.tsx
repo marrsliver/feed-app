@@ -228,7 +228,7 @@ export function PostPanel({ post, feedId, onRead, onMove, onDelete, onOpenSource
 
       {/* Panel */}
       <div className={inline
-        ? 'w-[28rem] shrink-0 flex flex-col overflow-hidden border border-black/10 bg-white animate-slide-right h-[calc(100vh-57px)] relative z-[45]'
+        ? 'w-[28rem] flex flex-col overflow-hidden border-l border-black/10 bg-white animate-slide-right h-[calc(100vh-57px)] fixed top-[57px] right-0 z-[45]'
         : 'fixed top-0 right-0 h-full w-full max-w-md z-[90] bg-white flex flex-col overflow-hidden animate-slide-right'
       }>
         {/* Space picker overlay */}

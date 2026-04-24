@@ -335,7 +335,7 @@ export function SourcePanel({ source, categories, industries = [], allTags, sour
   return (
     <>
     <div className={inline
-      ? 'w-[28rem] shrink-0 flex flex-col overflow-hidden border border-black/10 bg-white animate-slide-right h-[calc(100vh-57px)] relative z-[45]'
+      ? 'w-[28rem] flex flex-col overflow-hidden border-l border-black/10 bg-white animate-slide-right h-[calc(100vh-57px)] fixed top-[57px] right-0 z-[45]'
       : `fixed top-[57px] right-0 h-[calc(100vh-57px)] w-full max-w-md bg-white flex flex-col overflow-hidden shadow-xl border-l border-black/10 animate-slide-right ${topLayer ? 'z-[95]' : 'z-[70]'}`
     }>
         {/* Color bar */}

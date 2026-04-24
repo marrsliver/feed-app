@@ -418,7 +418,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   return (
     <>
     <div className="flex items-start gap-0 min-w-0">
-    <div className="flex-1 min-w-0 space-y-4">
+    <div className={`flex-1 min-w-0 space-y-4 ${openPost || sidebarSelectedSourceId ? 'pr-[28rem]' : ''}`}>
       {/* Toolbar */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
         <div className="flex items-center gap-2">
