@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { usePendingWrites } from '@/hooks/usePendingWrites'
 
 interface Props {
@@ -10,6 +11,12 @@ interface Props {
 
 export function Header({ activeFeed, sourcesCount }: Props) {
   const { pendingCount, retrying, retry, dismissAll } = usePendingWrites()
+  const router = useRouter()
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+  }
 
   return (
     <header className="border-b border-black/10">
@@ -74,6 +81,12 @@ export function Header({ activeFeed, sourcesCount }: Props) {
               {sourcesCount} source{sourcesCount !== 1 ? 's' : ''}
             </span>
           )}
+          <button
+            onClick={handleLogout}
+            className="text-xs text-black/30 hover:text-black transition-colors"
+          >
+            Log out
+          </button>
         </div>
       </div>
     </header>
