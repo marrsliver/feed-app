@@ -141,7 +141,10 @@ export async function GET(req: Request) {
         id: `${sourceId}-${urlId(link)}`,
         title,
         url: link,
-        date: date ? new Date(date).toISOString() : new Date().toISOString(),
+        date: (() => {
+          const parsed = date ? new Date(date) : null
+          return parsed && !isNaN(parsed.getTime()) ? parsed.toISOString() : new Date().toISOString()
+        })(),
         excerpt: excerpt || undefined,
         image,
         commentCount,

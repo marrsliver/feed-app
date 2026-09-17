@@ -61,6 +61,20 @@ function applyUpdate(
   return spaces.map((s) => (s.id === spaceId ? mutate(s) : s))
 }
 
+// useSpaces() mounts once per BookmarkButton (one per post card), so a naive
+// per-instance fetch would fire one GET /api/db/lists per card. Share a single
+// in-flight request across all instances mounting around the same time.
+let sharedListsFetch: Promise<Space[] | null> | null = null
+function fetchListsShared(): Promise<Space[] | null> {
+  if (!sharedListsFetch) {
+    sharedListsFetch = fetch('/api/db/lists')
+      .then((r) => r.json())
+      .catch(() => null)
+      .finally(() => { sharedListsFetch = null })
+  }
+  return sharedListsFetch
+}
+
 export function useSpaces() {
   const [spaces, setSpaces] = useState<Space[]>(() => {
     const deletedIds = readDeletedIds()
@@ -83,9 +97,8 @@ export function useSpaces() {
   }, [])
 
   const refetch = useCallback(() => {
-    fetch('/api/db/lists')
-      .then((r) => r.json())
-      .then((data: Space[]) => {
+    fetchListsShared()
+      .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           // Preserve locally-stored tags (not yet in DB)
           const localTags: Record<string, string[]> = {}

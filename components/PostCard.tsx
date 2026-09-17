@@ -35,6 +35,7 @@ function formatDate(dateStr: string): string {
 
 function PostCardInner({ post, feedId, isRead, onRead, onMove, onDelete, onOpenSource, onAddNoteToSpace, onOpenPost, onSavedToSpace, savedInSpaces, onNavigateToSpace }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const [imgError, setImgError] = useState(false)
 
   return (
     <>
@@ -51,7 +52,7 @@ function PostCardInner({ post, feedId, isRead, onRead, onMove, onDelete, onOpenS
           }}
         >
           {/* Image */}
-          {post.image && (
+          {post.image && !imgError && (
             <div className="relative w-full overflow-hidden bg-black/5">
               <Image
                 src={post.image}
@@ -60,6 +61,7 @@ function PostCardInner({ post, feedId, isRead, onRead, onMove, onDelete, onOpenS
                 height={400}
                 className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-500"
                 unoptimized
+                onError={() => setImgError(true)}
               />
             </div>
           )}
