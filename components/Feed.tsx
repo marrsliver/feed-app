@@ -706,6 +706,8 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
           onResetSources={() => setActiveSources(new Set(allSourceIds))}
           onOpenSources={() => setSourcesOpen(true)}
           onOpenAsk={() => setAskOpen(true)}
+          onLoadMore={loadMore}
+          canLoadMore={canLoadMore}
         />
         {overlays}
         {detailPanels}
