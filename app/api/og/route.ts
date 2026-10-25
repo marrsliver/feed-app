@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio'
 import { NextResponse } from 'next/server'
 import { isSafeUrl } from '@/lib/safe-url'
+import { HTML_HEADERS } from '@/lib/fetchHeaders'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
 
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
+      headers: HTML_HEADERS,
       signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)

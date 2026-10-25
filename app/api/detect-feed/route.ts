@@ -1,13 +1,14 @@
 import * as cheerio from 'cheerio'
 import { NextResponse } from 'next/server'
 import { isSafeUrl } from '@/lib/safe-url'
+import { FEED_HEADERS, HTML_HEADERS } from '@/lib/fetchHeaders'
 
 const COMMON_FEED_PATHS = ['/feed', '/rss', '/feed.xml', '/atom.xml', '/rss.xml', '/index.xml']
 
 async function tryFeedUrl(url: string): Promise<{ feedUrl: string; title: string } | null> {
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
+      headers: FEED_HEADERS,
       signal: AbortSignal.timeout(6000),
     })
     if (!res.ok) return null
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   try {
     // 2. Fetch as HTML, look for <link rel="alternate"> feed tags
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
+      headers: HTML_HEADERS,
       signal: AbortSignal.timeout(8000),
     })
     if (res.ok) {

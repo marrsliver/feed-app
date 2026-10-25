@@ -30,6 +30,8 @@ import { useManualPosts } from '@/hooks/useManualPosts'
 import { useDeletedPosts } from '@/hooks/useDeletedPosts'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import { useReadPosts } from '@/hooks/useReadPosts'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MobileFeed } from './mobile/MobileFeed'
 
 interface Props {
   feedId: string
@@ -194,6 +196,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
   const [shuffleSeed, setShuffleSeed] = useState<number | null>(null)
   const [selectSourcesOpen, setSelectSourcesOpen] = useState(false)
   const { isRead, markRead } = useReadPosts()
+  const isMobile = useIsMobile()
 
   // Open sources cards view when triggered by parent (e.g. header tab)
   const prevOpenTick = useRef(0)
@@ -415,13 +418,308 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
     if (activeSources.size === allSourceIds.length) setIncludeAssociated(false)
   }, [activeSources.size, allSourceIds.length])
 
+  const overlays = (
+    <>
+      {/* Sources sidebar */}
+      {sourcesOpen && (
+        <SourcesSidebar
+          feedId={feedId}
+          staticSources={feedStaticSources}
+          allStaticSources={staticSources}
+          userSources={userSources}
+          categories={categories}
+          industries={industries}
+          onAddSource={addSource}
+          onRemoveSource={removeSource}
+          onRenameSource={renameSource}
+          onToggleFeed={toggleFeed}
+          onCreateCategory={createCategory}
+          onCreateIndustry={createIndustry}
+          onOpenSource={(id) => {
+            openSidebarSource(id)
+          }}
+          onClose={() => setSourcesOpen(false)}
+          onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
+          elevated={sourcesCardsOpen}
+          onAddAssociation={addAssociation}
+        />
+      )}
+
+      {/* Sources cards view */}
+      {sourcesCardsOpen && (
+        <SourcesCardsView
+          sources={allSources}
+          categories={categories}
+          industries={industries}
+          allTags={allTags}
+          sourceLists={sourceLists}
+          onSetCategory={setCategory}
+          onSetIndustry={setIndustry}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onToggleSourceInList={toggleSourceInList}
+          onCreateSourceList={createSourceList}
+          onCreateCategory={createCategory}
+          onCreateIndustry={createIndustry}
+          onToggleFeed={toggleFeed}
+          onRenameSource={renameSource}
+          onShowLibrary={() => { setSourcesOpen(true) }}
+          onClose={() => setSourcesCardsOpen(false)}
+          allFeedPosts={allPosts}
+          savedLists={lists}
+          isRead={isRead}
+          selectedId={sourcesCardsPanelId}
+          onSelectSource={openSourcesCardsPanel}
+          onAddSourceCard={addSourceCard}
+          onRemoveSourceCard={removeSourceCard}
+        />
+      )}
+
+      {/* Add link panel */}
+      {addLinkOpen && (
+        <AddLinkPanel feedId={feedId} onAdd={addPost} onClose={() => setAddLinkOpen(false)} />
+      )}
+
+      {/* Archive panel */}
+      {archiveOpen && (
+        <ArchivePanel
+          records={deletedPosts}
+          onRestore={restorePost}
+          onClose={() => setArchiveOpen(false)}
+        />
+      )}
+
+      {/* Ask panel */}
+      {askOpen && (
+        <AskPanel posts={allPosts} onClose={() => setAskOpen(false)} />
+      )}
+
+
+      {/* TagSourcesPanel opened from sidebar context */}
+      {sidebarTagPanel && (
+        <TagSourcesPanel
+          tag={sidebarTagPanel}
+          sources={allSources}
+          categories={categories}
+          allTags={allTags}
+          onSetCategory={setCategory}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onCreateCategory={createCategory}
+          onClose={() => setSidebarTagPanel(null)}
+        />
+      )}
+
+      {/* Select Sources modal */}
+      {selectSourcesOpen && (
+        <SelectSourcesModal
+          sources={allSourcesForModal}
+          activeSources={activeSources}
+          feedSourceIds={new Set(allSourceIds)}
+          categories={categories}
+          industries={industries}
+          initialIncludeAssociated={includeAssociated}
+          hasAssociations={allSources.some(s => (s.associations ?? []).length > 0)}
+          onConfirm={(selected, incAssoc) => { setActiveSources(selected); setIncludeAssociated(incAssoc) }}
+          onClose={() => setSelectSourcesOpen(false)}
+        />
+      )}
+
+      {/* Lists sidebar */}
+      {sidebarOpen && (
+        <ListsSidebar
+          lists={lists}
+          view={view}
+          onSetView={setView}
+          onClose={() => setSidebarOpen(false)}
+          onCreate={createList}
+          onRename={renameList}
+          onDelete={deleteList}
+        />
+      )}
+
+    </>
+  )
+
+  const detailPanels = (
+    <>
+    {/* Inline panels — sticky alongside feed */}
+    {openPost && (
+      <PostPanel
+        inline={!isMobile}
+        post={openPost}
+        feedId={feedId}
+        onRead={() => markRead(openPost.id)}
+        onOpenSource={(sourceId) => {
+          openSidebarSource(sourceId)
+          setSourceOpenedFromPost(true)
+        }}
+        onNavigateToSpace={(spaceId) => {
+          try { if (openPost) sessionStorage.setItem('pendingOpenPost', JSON.stringify(openPost)) } catch {}
+          router.push(`/remix?space=${spaceId}`)
+        }}
+        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
+        onAddNoteToSpaceId={(content, spaceId, commentId) => addNote(spaceId, content, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId })}
+        onCreateSpace={(name, noteContent, commentId) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId }) }}
+        onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
+        commentToSpaces={commentToSpaces}
+        onSavePostToSpace={(spaceId) => {
+          if (!openPost) return
+          const already = spaces.find((s) => s.id === spaceId)?.items.some((i) => i.type === 'post' && i.refId === openPost.id)
+          if (!already) {
+            const sourceRef = openPost.sourceId !== 'manual' ? openPost.sourceId : undefined
+            addPostToSpace(spaceId, openPost, { sourceRef, cardRef: sourceRef ? openPost.id : undefined })
+            if (sourceRef) addSourceCard(sourceRef, { id: openPost.id, url: openPost.url, title: openPost.title, addedAt: Date.now() })
+          }
+        }}
+        onCreateSpaceForPost={(name) => {
+          if (!openPost) return
+          const id = createSpace(name)
+          const sourceRef = openPost.sourceId !== 'manual' ? openPost.sourceId : undefined
+          addPostToSpace(id, openPost, { sourceRef, cardRef: sourceRef ? openPost.id : undefined })
+          if (sourceRef) addSourceCard(sourceRef, { id: openPost.id, url: openPost.url, title: openPost.title, addedAt: Date.now() })
+        }}
+        onCreateSpaceForNote={(name) => {
+          return createSpace(name)
+        }}
+        onBack={handlePanelBack}
+        onClose={handlePanelClose}
+      />
+    )}
+    {sidebarSelectedSource && (
+      <SourcePanel
+        inline={!isMobile}
+        source={sidebarSelectedSource}
+        categories={categories}
+        industries={industries}
+        allTags={allTags}
+        sourceLists={sourceLists}
+        onSetCategory={setCategory}
+        onSetIndustry={setIndustry}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
+        onToggleSourceInList={toggleSourceInList}
+        onCreateSourceList={createSourceList}
+        onPromoteTag={() => openSidebarSource(null)}
+        onTagClick={(tag) => { openSidebarSource(null); setSidebarTagPanel(tag) }}
+        onCreateCategory={createCategory}
+        onCreateIndustry={createIndustry}
+        onRenameSource={renameSource}
+        onBack={handlePanelBack}
+        onClose={() => { handlePanelClose() }}
+        allFeedPosts={allPosts}
+        savedLists={lists}
+        isRead={isRead}
+        onAddSourceCard={addSourceCard}
+        onRemoveSourceCard={removeSourceCard}
+        onNavigateToSpace={(spaceId) => {
+          try { sessionStorage.setItem('pendingOpenSource', sidebarSelectedSourceId ?? '') } catch {}
+          router.push(`/remix?space=${spaceId}`)
+        }}
+        onOpenPiece={(post) => openPostInline(post)}
+        allLibrarySources={allSources}
+        onAddAssociation={sidebarSelectedSourceId ? (targetId) => addAssociation(sidebarSelectedSourceId, targetId) : undefined}
+        onRemoveAssociation={sidebarSelectedSourceId ? (targetId) => removeAssociation(sidebarSelectedSourceId, targetId) : undefined}
+        onOpenAssociation={(src) => openSidebarSource(src.id)}
+        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
+        onSetSummary={setSummary}
+        onAddPieceToSpace={(spaceId, card) => { const source = sidebarSelectedSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
+        onShowPieceOnAssociations={(card, targetSourceIds) => { const source = sidebarSelectedSource; if (!source) return; const base: SpaceItem = { id: card.id, type: 'post' as const, postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post, copyGroupId: card.id, cardRef: card.id, sourceRef: source.id, addedAt: card.addedAt }; for (const sid of targetSourceIds) { appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }); addSourceCard(sid, card) } }}
+      />
+    )}
+    {sourcesCardsPanelSource && !sourcesCardsOpen && (
+      <SourcePanel
+        inline={!isMobile}
+        source={sourcesCardsPanelSource}
+        categories={categories}
+        industries={industries}
+        allTags={allTags}
+        sourceLists={sourceLists}
+        onSetCategory={setCategory}
+        onSetIndustry={setIndustry}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
+        onToggleSourceInList={toggleSourceInList}
+        onCreateSourceList={createSourceList}
+        onPromoteTag={() => openSourcesCardsPanel(null)}
+        onTagClick={(tag) => { openSourcesCardsPanel(null); setSidebarTagPanel(tag) }}
+        onCreateCategory={createCategory}
+        onCreateIndustry={createIndustry}
+        onRenameSource={renameSource}
+        onClose={() => openSourcesCardsPanel(null)}
+        allFeedPosts={allPosts}
+        savedLists={lists}
+        isRead={isRead}
+        onAddSourceCard={addSourceCard}
+        onRemoveSourceCard={removeSourceCard}
+        onNavigateToSpace={(spaceId) => {
+          try { sessionStorage.setItem('pendingOpenSource', sourcesCardsPanelId ?? '') } catch {}
+          router.push(`/remix?space=${spaceId}`)
+        }}
+        onOpenPiece={(post) => openPostInline(post)}
+        allLibrarySources={allSources}
+        onAddAssociation={sourcesCardsPanelId ? (targetId) => addAssociation(sourcesCardsPanelId, targetId) : undefined}
+        onRemoveAssociation={sourcesCardsPanelId ? (targetId) => removeAssociation(sourcesCardsPanelId, targetId) : undefined}
+        onOpenAssociation={(src) => openSourcesCardsPanel(src.id)}
+        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
+        onSetSummary={setSummary}
+        onAddPieceToSpace={(spaceId, card) => { const source = sourcesCardsPanelSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
+        onShowPieceOnAssociations={(card, targetSourceIds) => { const source = sourcesCardsPanelSource; if (!source) return; const base: SpaceItem = { id: card.id, type: 'post' as const, postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post, copyGroupId: card.id, cardRef: card.id, sourceRef: source.id, addedAt: card.addedAt }; for (const sid of targetSourceIds) { appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }); addSourceCard(sid, card) } }}
+      />
+    )}
+    </>
+  )
+
+  function savePostToSpace(post: Post, spaceId: string) {
+    const already = spaces.find((s) => s.id === spaceId)?.items.some((i) => i.type === 'post' && i.refId === post.id)
+    if (already) return
+    const sourceRef = post.sourceId !== 'manual' ? post.sourceId : undefined
+    addPostToSpace(spaceId, post, { sourceRef, cardRef: sourceRef ? post.id : undefined })
+    if (sourceRef) addSourceCard(sourceRef, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })
+  }
+
+  // Wait for the client so phones never flash the desktop layout
+  if (isMobile === null) return null
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileFeed
+          posts={allPosts}
+          ready={sourcesLoaded && status === 'success' && !userSourcesLoading}
+          filterKey={activeSources.size === allSourceIds.length ? 'all' : [...activeSources].sort().join(',')}
+          sourceCount={allSourceIds.length}
+          isRead={isRead}
+          markRead={markRead}
+          spaces={spaces.filter((s) => !s.deletedAt)}
+          postToSpaces={postToSpaces}
+          onSaveToSpace={savePostToSpace}
+          onCreateSpaceAndSave={(post, name) => savePostToSpace(post, createSpace(name))}
+          onArchive={(post) => {
+            archivePost(post, feedId, post.sourceId === 'manual')
+            if (post.sourceId === 'manual') removePost(post.id)
+          }}
+          onRestore={restorePost}
+          filterSources={filterSources}
+          activeSources={activeSources}
+          onToggleSource={toggleSource}
+          onResetSources={() => setActiveSources(new Set(allSourceIds))}
+          onOpenSources={() => setSourcesOpen(true)}
+          onOpenAsk={() => setAskOpen(true)}
+        />
+        {overlays}
+        {detailPanels}
+      </>
+    )
+  }
+
   return (
     <>
     <div className="flex items-start gap-0 min-w-0">
     <div className={`flex-1 min-w-0 space-y-4 ${openPost || sidebarSelectedSourceId ? 'pr-[28rem]' : ''}`}>
       {/* Toolbar */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-black/10 pb-3 pt-4 space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
 
           {/* Group 1: Sources (research feed only) */}
           {showSources && (
@@ -567,123 +865,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
         </div>
       </div>
 
-      {/* Sources sidebar */}
-      {sourcesOpen && (
-        <SourcesSidebar
-          feedId={feedId}
-          staticSources={feedStaticSources}
-          allStaticSources={staticSources}
-          userSources={userSources}
-          categories={categories}
-          industries={industries}
-          onAddSource={addSource}
-          onRemoveSource={removeSource}
-          onRenameSource={renameSource}
-          onToggleFeed={toggleFeed}
-          onCreateCategory={createCategory}
-          onCreateIndustry={createIndustry}
-          onOpenSource={(id) => {
-            openSidebarSource(id)
-          }}
-          onClose={() => setSourcesOpen(false)}
-          onShowCards={() => { setSourcesOpen(false); setSourcesCardsOpen(true) }}
-          elevated={sourcesCardsOpen}
-          onAddAssociation={addAssociation}
-        />
-      )}
-
-      {/* Sources cards view */}
-      {sourcesCardsOpen && (
-        <SourcesCardsView
-          sources={allSources}
-          categories={categories}
-          industries={industries}
-          allTags={allTags}
-          sourceLists={sourceLists}
-          onSetCategory={setCategory}
-          onSetIndustry={setIndustry}
-          onAddTag={addTag}
-          onRemoveTag={removeTag}
-          onToggleSourceInList={toggleSourceInList}
-          onCreateSourceList={createSourceList}
-          onCreateCategory={createCategory}
-          onCreateIndustry={createIndustry}
-          onToggleFeed={toggleFeed}
-          onRenameSource={renameSource}
-          onShowLibrary={() => { setSourcesOpen(true) }}
-          onClose={() => setSourcesCardsOpen(false)}
-          allFeedPosts={allPosts}
-          savedLists={lists}
-          isRead={isRead}
-          selectedId={sourcesCardsPanelId}
-          onSelectSource={openSourcesCardsPanel}
-          onAddSourceCard={addSourceCard}
-          onRemoveSourceCard={removeSourceCard}
-        />
-      )}
-
-      {/* Add link panel */}
-      {addLinkOpen && (
-        <AddLinkPanel feedId={feedId} onAdd={addPost} onClose={() => setAddLinkOpen(false)} />
-      )}
-
-      {/* Archive panel */}
-      {archiveOpen && (
-        <ArchivePanel
-          records={deletedPosts}
-          onRestore={restorePost}
-          onClose={() => setArchiveOpen(false)}
-        />
-      )}
-
-      {/* Ask panel */}
-      {askOpen && (
-        <AskPanel posts={allPosts} onClose={() => setAskOpen(false)} />
-      )}
-
-
-      {/* TagSourcesPanel opened from sidebar context */}
-      {sidebarTagPanel && (
-        <TagSourcesPanel
-          tag={sidebarTagPanel}
-          sources={allSources}
-          categories={categories}
-          allTags={allTags}
-          onSetCategory={setCategory}
-          onAddTag={addTag}
-          onRemoveTag={removeTag}
-          onCreateCategory={createCategory}
-          onClose={() => setSidebarTagPanel(null)}
-        />
-      )}
-
-      {/* Select Sources modal */}
-      {selectSourcesOpen && (
-        <SelectSourcesModal
-          sources={allSourcesForModal}
-          activeSources={activeSources}
-          feedSourceIds={new Set(allSourceIds)}
-          categories={categories}
-          industries={industries}
-          initialIncludeAssociated={includeAssociated}
-          hasAssociations={allSources.some(s => (s.associations ?? []).length > 0)}
-          onConfirm={(selected, incAssoc) => { setActiveSources(selected); setIncludeAssociated(incAssoc) }}
-          onClose={() => setSelectSourcesOpen(false)}
-        />
-      )}
-
-      {/* Lists sidebar */}
-      {sidebarOpen && (
-        <ListsSidebar
-          lists={lists}
-          view={view}
-          onSetView={setView}
-          onClose={() => setSidebarOpen(false)}
-          onCreate={createList}
-          onRename={renameList}
-          onDelete={deleteList}
-        />
-      )}
+      {overlays}
 
       {/* Skeleton loader */}
       {status === 'pending' && feedStaticSources.length > 0 && <FeedSkeleton />}
@@ -755,130 +937,7 @@ export function Feed({ feedId, showSources, openSourcesCards: openSourcesCardsPr
       )}
     </div>
 
-    {/* Inline panels — sticky alongside feed */}
-    {openPost && (
-      <PostPanel
-        inline
-        post={openPost}
-        feedId={feedId}
-        onRead={() => markRead(openPost.id)}
-        onOpenSource={(sourceId) => {
-          openSidebarSource(sourceId)
-          setSourceOpenedFromPost(true)
-        }}
-        onNavigateToSpace={(spaceId) => {
-          try { if (openPost) sessionStorage.setItem('pendingOpenPost', JSON.stringify(openPost)) } catch {}
-          router.push(`/remix?space=${spaceId}`)
-        }}
-        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
-        onAddNoteToSpaceId={(content, spaceId, commentId) => addNote(spaceId, content, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId })}
-        onCreateSpace={(name, noteContent, commentId) => { const id = createSpace(name); addNote(id, noteContent, { postRef: openPost ?? undefined, sourceRef: openPost?.sourceId, commentId }) }}
-        onSavedToSpace={(post) => addSourceCard(post.sourceId, { id: post.id, url: post.url, title: post.title, addedAt: Date.now() })}
-        commentToSpaces={commentToSpaces}
-        onSavePostToSpace={(spaceId) => {
-          if (!openPost) return
-          const already = spaces.find((s) => s.id === spaceId)?.items.some((i) => i.type === 'post' && i.refId === openPost.id)
-          if (!already) {
-            const sourceRef = openPost.sourceId !== 'manual' ? openPost.sourceId : undefined
-            addPostToSpace(spaceId, openPost, { sourceRef, cardRef: sourceRef ? openPost.id : undefined })
-            if (sourceRef) addSourceCard(sourceRef, { id: openPost.id, url: openPost.url, title: openPost.title, addedAt: Date.now() })
-          }
-        }}
-        onCreateSpaceForPost={(name) => {
-          if (!openPost) return
-          const id = createSpace(name)
-          const sourceRef = openPost.sourceId !== 'manual' ? openPost.sourceId : undefined
-          addPostToSpace(id, openPost, { sourceRef, cardRef: sourceRef ? openPost.id : undefined })
-          if (sourceRef) addSourceCard(sourceRef, { id: openPost.id, url: openPost.url, title: openPost.title, addedAt: Date.now() })
-        }}
-        onCreateSpaceForNote={(name) => {
-          return createSpace(name)
-        }}
-        onBack={handlePanelBack}
-        onClose={handlePanelClose}
-      />
-    )}
-    {sidebarSelectedSource && (
-      <SourcePanel
-        inline
-        source={sidebarSelectedSource}
-        categories={categories}
-        industries={industries}
-        allTags={allTags}
-        sourceLists={sourceLists}
-        onSetCategory={setCategory}
-        onSetIndustry={setIndustry}
-        onAddTag={addTag}
-        onRemoveTag={removeTag}
-        onToggleSourceInList={toggleSourceInList}
-        onCreateSourceList={createSourceList}
-        onPromoteTag={() => openSidebarSource(null)}
-        onTagClick={(tag) => { openSidebarSource(null); setSidebarTagPanel(tag) }}
-        onCreateCategory={createCategory}
-        onCreateIndustry={createIndustry}
-        onRenameSource={renameSource}
-        onBack={handlePanelBack}
-        onClose={() => { handlePanelClose() }}
-        allFeedPosts={allPosts}
-        savedLists={lists}
-        isRead={isRead}
-        onAddSourceCard={addSourceCard}
-        onRemoveSourceCard={removeSourceCard}
-        onNavigateToSpace={(spaceId) => {
-          try { sessionStorage.setItem('pendingOpenSource', sidebarSelectedSourceId ?? '') } catch {}
-          router.push(`/remix?space=${spaceId}`)
-        }}
-        onOpenPiece={(post) => openPostInline(post)}
-        allLibrarySources={allSources}
-        onAddAssociation={sidebarSelectedSourceId ? (targetId) => addAssociation(sidebarSelectedSourceId, targetId) : undefined}
-        onRemoveAssociation={sidebarSelectedSourceId ? (targetId) => removeAssociation(sidebarSelectedSourceId, targetId) : undefined}
-        onOpenAssociation={(src) => openSidebarSource(src.id)}
-        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
-        onSetSummary={setSummary}
-        onAddPieceToSpace={(spaceId, card) => { const source = sidebarSelectedSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
-        onShowPieceOnAssociations={(card, targetSourceIds) => { const source = sidebarSelectedSource; if (!source) return; const base: SpaceItem = { id: card.id, type: 'post' as const, postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post, copyGroupId: card.id, cardRef: card.id, sourceRef: source.id, addedAt: card.addedAt }; for (const sid of targetSourceIds) { appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }); addSourceCard(sid, card) } }}
-      />
-    )}
-    {sourcesCardsPanelSource && !sourcesCardsOpen && (
-      <SourcePanel
-        inline
-        source={sourcesCardsPanelSource}
-        categories={categories}
-        industries={industries}
-        allTags={allTags}
-        sourceLists={sourceLists}
-        onSetCategory={setCategory}
-        onSetIndustry={setIndustry}
-        onAddTag={addTag}
-        onRemoveTag={removeTag}
-        onToggleSourceInList={toggleSourceInList}
-        onCreateSourceList={createSourceList}
-        onPromoteTag={() => openSourcesCardsPanel(null)}
-        onTagClick={(tag) => { openSourcesCardsPanel(null); setSidebarTagPanel(tag) }}
-        onCreateCategory={createCategory}
-        onCreateIndustry={createIndustry}
-        onRenameSource={renameSource}
-        onClose={() => openSourcesCardsPanel(null)}
-        allFeedPosts={allPosts}
-        savedLists={lists}
-        isRead={isRead}
-        onAddSourceCard={addSourceCard}
-        onRemoveSourceCard={removeSourceCard}
-        onNavigateToSpace={(spaceId) => {
-          try { sessionStorage.setItem('pendingOpenSource', sourcesCardsPanelId ?? '') } catch {}
-          router.push(`/remix?space=${spaceId}`)
-        }}
-        onOpenPiece={(post) => openPostInline(post)}
-        allLibrarySources={allSources}
-        onAddAssociation={sourcesCardsPanelId ? (targetId) => addAssociation(sourcesCardsPanelId, targetId) : undefined}
-        onRemoveAssociation={sourcesCardsPanelId ? (targetId) => removeAssociation(sourcesCardsPanelId, targetId) : undefined}
-        onOpenAssociation={(src) => openSourcesCardsPanel(src.id)}
-        allSpaces={spaces.filter(s => !s.deletedAt).map(s => ({ id: s.id, name: s.name }))}
-        onSetSummary={setSummary}
-        onAddPieceToSpace={(spaceId, card) => { const source = sourcesCardsPanelSource; if (!source) return; const post = { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post; addPostToSpace(spaceId, post, { sourceRef: source.id, cardRef: card.id }) }}
-        onShowPieceOnAssociations={(card, targetSourceIds) => { const source = sourcesCardsPanelSource; if (!source) return; const base: SpaceItem = { id: card.id, type: 'post' as const, postData: { id: card.id, title: card.title, url: card.url, date: new Date(card.addedAt).toISOString(), sourceId: source.id, sourceName: source.name, sourceColor: source.color } as Post, copyGroupId: card.id, cardRef: card.id, sourceRef: source.id, addedAt: card.addedAt }; for (const sid of targetSourceIds) { appendSourceItem(sid, { ...base, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }); addSourceCard(sid, card) } }}
-      />
-    )}
+    {detailPanels}
     </div>
     </>
   )

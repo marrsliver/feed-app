@@ -46,6 +46,10 @@ html {
   from { opacity: 0; transform: scale(0.97) translateY(4px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
 @keyframes shimmer {
   from { background-position: -400px 0; }
   to   { background-position: 400px 0; }
@@ -59,6 +63,9 @@ html {
 }
 .animate-fade-in {
   animation: fadeIn 0.18s ease both;
+}
+.animate-sheet-up {
+  animation: sheetUp 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 .animate-scale-in {
   animation: scaleIn 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;

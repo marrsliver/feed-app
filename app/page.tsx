@@ -11,11 +11,14 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <Header
-        activeFeed="research"
-        sourcesCount={sources.length}
-      />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Phones get their own full-screen shell from <Feed> */}
+      <div className="hidden md:block">
+        <Header
+          activeFeed="research"
+          sourcesCount={sources.length}
+        />
+      </div>
+      <div className="max-w-7xl mx-auto md:px-6 lg:px-8 md:py-6">
         <Feed
           feedId="research"
           showSources

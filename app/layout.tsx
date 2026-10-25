@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/Providers'
@@ -9,6 +9,14 @@ const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-displ
 export const metadata: Metadata = {
   title: 'Research Feed',
   description: 'A Pinterest-style aggregator for research blogs and publications',
+  appleWebApp: { capable: true, title: 'Feed', statusBarStyle: 'black-translucent' },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#000000',
 }
 
 export default function RootLayout({

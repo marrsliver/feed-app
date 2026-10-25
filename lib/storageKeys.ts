@@ -22,6 +22,9 @@ export const LS_KEYS = {
   SPACES:              'saved_lists_cache_v1',
   SPACES_TRASH:        'spaces_trash_v1',
   SPACES_DELETED_IDS:  'spaces_deleted_ids_v1',
+  MOBILE_EDITION:      'mobile_edition_v1',
+  MOBILE_RECENT_SPACE: 'mobile_recent_space_v1',
+  MOBILE_HINT_DONE:    'mobile_swipe_hint_done_v1',
 
   // Write queue
   PENDING_WRITES:      'pending_writes_v2',

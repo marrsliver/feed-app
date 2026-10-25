@@ -3,6 +3,7 @@ import { createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { Post } from '@/lib/types'
 import { isSafeUrl } from '@/lib/safe-url'
+import { FEED_HEADERS } from '@/lib/fetchHeaders'
 
 function urlId(url: string) {
   return createHash('sha1').update(url).digest('hex').slice(0, 16)
@@ -18,7 +19,7 @@ async function tryWordPressApi(
   sourceColor: string,
   page: number
 ): Promise<{ posts: Post[]; hasMore: boolean }> {
-  const headers = { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' }
+  const headers = FEED_HEADERS
   for (const type of WP_POST_TYPES) {
     try {
       const res = await fetch(
@@ -83,7 +84,7 @@ export async function GET(req: Request) {
 
     // Page 1: fetch RSS/Atom feed
     const res = await fetch(feedUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; feed-app/1.0)' },
+      headers: FEED_HEADERS,
       signal: AbortSignal.timeout(10000),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -99,7 +100,7 @@ export async function GET(req: Request) {
     const posts: Post[] = []
     items.each((_, el) => {
       const $el = $(el)
-      const title = $el.find('title').first().text().trim()
+      const rawTitle = $el.find('title').first().text().trim()
 
       let link = ''
       if (isAtom) {
@@ -117,8 +118,12 @@ export async function GET(req: Request) {
       }
 
       const date = $el.find('pubDate, published, updated').first().text().trim()
-      const excerpt = $el.find('description, summary').first().text()
-        .replace(/<[^>]+>/g, '').trim().slice(0, 200) || undefined
+      const fullText = $el.find('description, summary, content').first().text()
+        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      const excerpt = fullText.slice(0, 200) || undefined
+
+      // Untitled posts (common on Blogger/Tumblr) — derive a title from the body
+      const title = rawTitle || (fullText.length > 80 ? fullText.slice(0, 80).replace(/\s\S*$/, '') + '…' : fullText)
 
       if (!title || !link) return
 
