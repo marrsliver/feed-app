@@ -342,7 +342,14 @@ export function MobileFeed({
           aria-hidden={tab !== 'home'}
           className={`absolute inset-0 overflow-y-auto overscroll-contain bg-white ${tab === 'home' ? '' : 'invisible pointer-events-none'}`}
         >
-          <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-white/90 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3 backdrop-blur">
+          {/* Tapping the header jumps back to the top, like tapping the status bar in a native app */}
+          <header
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('button')) return
+              homeRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-white/90 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3 backdrop-blur cursor-pointer select-none"
+          >
             <div className="min-w-0">
               <div className="font-display text-[24px] font-semibold leading-none tracking-tight">Home</div>
               <div className="mt-1 text-[12px] text-black/40 truncate">
